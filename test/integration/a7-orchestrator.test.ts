@@ -65,7 +65,7 @@ async function seedReady(who: Who) {
   const [n1, n2] = [await node("CD1"), await node("L1")];
   for (const n of [n1, n2]) await ok(who, "POST", "/api/node_capacity", { node_id: n.stable_id, capacity_per_period: 100 });
   await ok(who, "POST", "/api/routes", { code: "R1", origin_node_id: n1.stable_id, dest_node_id: n2.stable_id, cost_per_unit: 2, lead_time_days: 1 });
-  await ok(who, "POST", "/api/skus", { code: "S1", name: "S1" });
+  await ok(who, "POST", "/api/skus", { code: "S1", name: "S1", unit_cost: 1, attrs: { unit_price: 2 } });
   await ok(who, "POST", "/api/policies", { kind: "capital de giro", name: "wc", body: {} });
   return { n1, n2 };
 }

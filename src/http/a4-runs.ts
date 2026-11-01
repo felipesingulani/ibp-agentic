@@ -2,6 +2,7 @@
  * W1c — API do run A4 (tenant via header + RLS, como /api/a4-readiness). Sem LLM, sem write-back.
  *   POST /api/a4-runs  {scenario_id, weights?, time_limit_ms?} → 202 {data: run(status queued)}
  *        400 invalid_reference (cenário inexistente/de outro tenant/não corrente) · 409 a4_not_ready (prontidão = block)
+ *        · 409 {error:{code:"cadastro_gate_block", items}} (AR-07, depois da prontidão, antes do INSERT)
  *   GET  /api/a4-runs?scenario_id=   → lista (mais recente primeiro)
  *   GET  /api/a4-runs/:id            → run: status queued|running|done|failed|discarded, outcome feasible|partial,
  *        summary = A4RunSummary (contracts/a4-run-summary.schema.json), plan, error.
@@ -16,6 +17,7 @@ import { executeRun } from "../a4/run.js";
 import { SOLVER_UNAVAILABLE, remoteSolverHealthy, remoteSolverUrl } from "../a4/solve.js";
 import { REASON_KINDS } from "../a4/explain.js";
 import { computeReadiness, loadReadinessFacts } from "../domain/a4Readiness.js";
+import { gateBlockBody, loadScenarioGates } from "../cadastro/gates.js";
 import { type Row, audit, ctxOf, requireUser, uuidRe } from "./common.js";
 import { HttpError } from "./errors.js";
 
@@ -50,19 +52,26 @@ export function a4RunsRouter(pool: Pool, opts: { defaultTimeLimitMs?: number } =
       res.status(503).json({ error: { code: SOLVER_UNAVAILABLE } }); // shape do contrato §4.3; sem transação aberta, sem INSERT
       return;
     }
-    const row = await withTenant(pool, ctx.tenantId, async (c) => {
+    const outcome = await withTenant(pool, ctx.tenantId, async (c) => {
       const sc = (await c.query("SELECT id, version FROM scenarios WHERE id = $1 AND is_current", [body.scenario_id])).rows[0];
       if (!sc) throw new HttpError(400, "invalid_reference", { field: "scenario_id" });
       const readiness = computeReadiness(await loadReadinessFacts(c));
       if (readiness.state === "block") throw new HttpError(409, "a4_not_ready", readiness);
+      const gates = await loadScenarioGates(c, String(sc.id));
+      if (gates.state === "block") return { blocked: gates.items };
       const code = `RUN-${new Date().toISOString().replace(/\D/g, "").slice(0, 14)}-${randomBytes(2).toString("hex")}`;
       const ins = (await c.query(
         `INSERT INTO a4_runs (tenant_id, run_code, scenario_id, scenario_version, status)
          VALUES ($1, $2, $3, $4, 'queued') RETURNING *`, [ctx.tenantId, code, sc.id, sc.version])).rows[0];
       await audit(c, ctx, "create", "a4_runs", ins.id as string,
         { scenario_id: sc.id, scenario_version: sc.version, weights: body.weights ?? null });
-      return ins;
+      return { row: ins as Row };
     });
+    if ("blocked" in outcome && outcome.blocked) {
+      res.status(409).json(gateBlockBody(outcome.blocked)); // shape aninhado (AR-07), como o 503 do solver — não HttpError
+      return;
+    }
+    const row = outcome.row;
     const timeLimitMs = body.time_limit_ms ?? opts.defaultTimeLimitMs ?? 5000;
     setImmediate(() => { void executeRun(pool, ctx.tenantId, row.id as string, { weights: body.weights, timeLimitMs }); });
     res.status(202).json({ data: runOut(row) });

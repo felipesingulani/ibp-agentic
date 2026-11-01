@@ -51,7 +51,7 @@ async function seedNetwork(who: Who) {
   const route = (code: string, o: { stable_id: string }, d: { stable_id: string }) =>
     ok(who, "POST", "/api/routes", { code, origin_node_id: o.stable_id, dest_node_id: d.stable_id, cost_per_unit: 2, lead_time_days: 1 });
   await route("R1", cd1, l1); await route("R2", cd2, l1); await route("R3", cd1, l2); await route("R4", cd2, l2);
-  const s1 = await ok(who, "POST", "/api/skus", { code: "S1", name: "S1" });
+  const s1 = await ok(who, "POST", "/api/skus", { code: "S1", name: "S1", unit_cost: 1, attrs: { unit_price: 2 } });
   await ok(who, "POST", "/api/policies", { kind: "Serviço", name: "svc", body: { min_fill_rate: 0.9, max_lead_time_days: 3 } });
   await ok(who, "POST", "/api/policies", { kind: "estoque", name: "est", body: {} });
   await ok(who, "POST", "/api/sales_history", { rows: [
