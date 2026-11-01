@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: ibp-agentic
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: MIGRATION_DATABASE_URL
+        sync: false
+      - key: APP_DB_USER
+        value: ibp_app
+      - key: APP_DB_PASSWORD
+        sync: false
+      - key: CORS_ORIGIN
+        value: ""

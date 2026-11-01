@@ -1,0 +1,68 @@
+{
+  "profile_id": "generic_no_alcada",
+  "name": "Genérico sem alçada",
+  "sim": false,
+  "labels": {
+    "node": "Nó",
+    "capacity": "armazenagem",
+    "route": "Rota",
+    "sku": "SKU",
+    "contract": "Contrato de fornecedor",
+    "capacity_uom": "un"
+  },
+  "uom": "un",
+  "node_types": [
+    "CD",
+    "Filial",
+    "Planta"
+  ],
+  "kpi_labels": {
+    "svc": "OTIF",
+    "wcp": "DSI",
+    "wc": "Working capital",
+    "cost": "Custo logístico",
+    "viol": "Violações de política"
+  },
+  "policy_kinds": {
+    "working_capital": [
+      "working_capital",
+      "capital_de_giro",
+      "wc"
+    ],
+    "inventory": [
+      "inventory",
+      "estoque",
+      "stock"
+    ],
+    "service": [
+      "service",
+      "servico",
+      "service_level"
+    ]
+  },
+  "agents": {
+    "A1": {
+      "enabled": true
+    },
+    "A2": {
+      "enabled": true
+    },
+    "A3": {
+      "enabled": true
+    },
+    "A4": {
+      "enabled": true,
+      "solver": "cbc"
+    },
+    "A5": {
+      "enabled": false
+    },
+    "A6": {
+      "enabled": false
+    },
+    "A7": {
+      "enabled": false,
+      "mode": "state_machine_only"
+    }
+  }
+}

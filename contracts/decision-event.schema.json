@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ibp-agentic.local/schemas/decision-event.schema.json",
+  "title": "DecisionEvent",
+  "description": "V0.2 — decisão no cockpit (aprovar ou escalar). Porquê obrigatório; audit trail. Sem write-back: approve = registrar + export. Campos opcionais de alçada (Task 8 / wire B): impactMi, alcadaMi, escalateTo — backward-compat com eventos V0.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "scenarioId",
+    "scenarioVersion",
+    "action",
+    "why",
+    "actor",
+    "at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenarioId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenarioVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "runId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Run A4 associado, se houver."
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "approve",
+        "escalate"
+      ]
+    },
+    "why": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Justificativa obrigatória (pt-BR)."
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role"
+      ],
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": [
+            "domain_owner",
+            "sales",
+            "supply",
+            "finance",
+            "system"
+          ]
+        },
+        "userId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "exportRef": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Path/id do export do plano quando action=approve."
+    },
+    "impactMi": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Impacto avaliado na decisão (mi da moeda do tenant). Opcional; fila W3 deriva se ausente."
+    },
+    "alcadaMi": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Limiar de alçada vigente no momento da decisão (mi). Opcional."
+    },
+    "escalateTo": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "finance",
+        "domain_owner",
+        null
+      ],
+      "description": "Destino do escalate (subconjunto de actor.role). Opcional; tipicamente finance|domain_owner."
+    }
+  }
+}

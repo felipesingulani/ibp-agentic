@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ibp-agentic.local/schemas/execution-movement.schema.json",
+  "title": "ExecutionMovement",
+  "description": "W4 · Task 10 — movimento de execução (programado/realizado) num bucket DIA, ligado a um plano (a4_runs). Saída de POST/GET /api/execution/movements. Void ≠ delete (status=void). Cravos PO 2026-10-30: bucket dia; batch all-or-nothing; limiar 15% fixo.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "planRunId", "scenarioId", "scenarioVersion", "periodStart", "kind", "nodeId", "skuId",
+    "qtyPlanned", "qtyActual", "uom", "status", "source", "note", "at", "actorUserId", "actorRole", "tags"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "planRunId": { "type": "string", "format": "uuid", "description": "a4_runs.id do plano de referência" },
+    "scenarioId": { "type": "string", "format": "uuid" },
+    "scenarioVersion": { "type": "integer", "minimum": 1 },
+    "periodStart": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "bucket = dia (YYYY-MM-DD)" },
+    "kind": { "enum": ["ship", "receive", "produce", "transfer", "other"] },
+    "nodeId": { "type": ["string", "null"], "format": "uuid", "description": "stable_id de nodes_identity" },
+    "skuId": { "type": ["string", "null"], "format": "uuid", "description": "stable_id de skus_identity" },
+    "qtyPlanned": { "type": ["number", "null"], "minimum": 0 },
+    "qtyActual": { "type": "number", "minimum": 0 },
+    "uom": { "type": ["string", "null"] },
+    "status": { "enum": ["posted", "void"] },
+    "source": { "enum": ["api", "seed", "import"] },
+    "note": { "type": ["string", "null"] },
+    "at": { "type": "string", "format": "date-time" },
+    "actorUserId": { "type": ["string", "null"], "format": "uuid" },
+    "actorRole": { "type": ["string", "null"] },
+    "tags": { "type": "array", "items": { "enum": ["unapproved_plan"] }, "uniqueItems": true,
+      "description": "unapproved_plan = o run não tem evento approve (A7); movimento aceito, plano não aprovado" }
+  }
+}

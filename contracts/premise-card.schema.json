@@ -1,0 +1,360 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ibp-agentic.local/schemas/premise-card.schema.json",
+  "title": "PremiseCard",
+  "description": "V0 — cartão de premissa tipado (ditado → editável). Wire Didi v0.2. A1 (T-A1-ENG): CurvaDemanda com fields.schema=a1.curva.v1 ⇒ $defs/curvaDemandaV1 (série derivada no servidor).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "type",
+    "fields",
+    "status",
+    "links",
+    "version",
+    "source"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "NovaFilial",
+        "CurvaDemanda",
+        "Investimento",
+        "Gap"
+      ]
+    },
+    "fields": {
+      "type": "object",
+      "description": "Campos tipados por type; V0 aceita mapa livre validado na aplicação.",
+      "additionalProperties": true
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "gap"
+      ]
+    },
+    "links": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "nodeId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "stable_id do nó (nodes.stable_id, identidade entre versões; nó precisa ter versão corrente). Persistido em premise_cards.node_id (migration 0007, FK composta (tenant_id, node_id) → nodes_identity). Nunca o id de uma linha-versão."
+        }
+      }
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "ditado",
+        "edit"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "Gap"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "links": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "nodeId"
+            ],
+            "properties": {
+              "nodeId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Gap exige stable_id de nó corrente."
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "type",
+          "fields"
+        ],
+        "properties": {
+          "type": {
+            "const": "CurvaDemanda"
+          },
+          "fields": {
+            "type": "object",
+            "required": [
+              "schema"
+            ],
+            "properties": {
+              "schema": {
+                "const": "a1.curva.v1"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "fields": {
+            "$ref": "#/$defs/curvaDemandaV1"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "curvaDemandaV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A1-CURVA-DEMANDA-CONTRACT §4. series/anchor.periodsUsed/uom/trace/gapCode = servidor; LLM só intenção/params.",
+      "required": [
+        "schema",
+        "perfil",
+        "rampUpMeses",
+        "maturidade",
+        "canibalizacao",
+        "anchor",
+        "series",
+        "uom",
+        "trace",
+        "gapCode"
+      ],
+      "properties": {
+        "schema": {
+          "const": "a1.curva.v1"
+        },
+        "perfil": {
+          "enum": [
+            "natural",
+            "linear",
+            "degrau"
+          ]
+        },
+        "rampUpMeses": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 18
+        },
+        "maturidade": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pct",
+            "mes"
+          ],
+          "properties": {
+            "pct": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "mes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 18
+            }
+          }
+        },
+        "canibalizacao": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "pct",
+                "nodeStableId",
+                "nodeRef"
+              ],
+              "properties": {
+                "pct": {
+                  "type": "number",
+                  "minimum": -100,
+                  "maximum": 0
+                },
+                "nodeStableId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "nodeRef": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "anchor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "nodeStableId",
+            "skuStableId",
+            "periodsUsed"
+          ],
+          "properties": {
+            "nodeStableId": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "stable_id de nó current; null só com gapCode=anchor_missing."
+            },
+            "skuStableId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "periodsUsed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 12
+            }
+          }
+        },
+        "series": {
+          "type": "array",
+          "maxItems": 18,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "period",
+              "qty",
+              "factor"
+            ],
+            "properties": {
+              "period": {
+                "type": "string",
+                "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"
+              },
+              "qty": {
+                "type": "number",
+                "minimum": 0
+              },
+              "factor": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "uom": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "tenant_settings.uom / pack (null se nenhum definido)"
+        },
+        "trace": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "method",
+                "histFrom",
+                "histTo",
+                "baseQty",
+                "histSource"
+              ],
+              "properties": {
+                "method": {
+                  "const": "a1.curva.v1"
+                },
+                "histFrom": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"
+                },
+                "histTo": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"
+                },
+                "baseQty": {
+                  "type": "number"
+                },
+                "histSource": {
+                  "const": "sales_history"
+                }
+              }
+            }
+          ]
+        },
+        "gapCode": {
+          "enum": [
+            null,
+            "hist_none",
+            "hist_insufficient",
+            "anchor_missing"
+          ]
+        },
+        "nodeRef": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "gapCode": {
+                "const": null
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "series": {
+                "minItems": 18
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "series": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

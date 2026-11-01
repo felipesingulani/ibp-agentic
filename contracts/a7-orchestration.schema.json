@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ibp-agentic.local/schemas/a7-orchestration.schema.json",
+  "title": "A7Orchestration",
+  "description": "T-A7-LEVE (A7-ORCHESTRATOR-LEVE-CONTRACT.md §3) — resposta 200 de POST /api/a7/evaluate. Máquina determinística state_machine_only: veredito + provocations stub (A1–A3/A5/A6; A4 nunca) + pacote mínimo + basis. committedEventId só quando commit=true gravou um DecisionEvent (actor.role=system).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "scenarioId", "scenarioVersion", "verdict", "provocations", "package", "basis", "committedEventId"],
+  "properties": {
+    "schema": { "const": "a7.orch.v1" },
+    "scenarioId": { "type": "string", "format": "uuid" },
+    "scenarioVersion": { "type": "integer", "minimum": 1 },
+    "verdict": { "type": "string", "enum": ["auto_policy", "escalate_human", "await_inputs"] },
+    "provocations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["agent", "code", "severity", "detail"],
+        "properties": {
+          "agent": { "type": "string", "enum": ["A1", "A2", "A3", "A5", "A6"], "description": "A4 nunca (solver não é provocado pelo A7 leve)." },
+          "code": {
+            "type": "string",
+            "enum": ["need_curve", "hist_gap", "anchor_missing", "supply_gap", "execution_exception",
+                     "alcada_misconfigured", "policy_violation", "alcada_required", "pulse_exception"]
+          },
+          "severity": { "type": "string", "enum": ["info", "warn", "block"] },
+          "detail": {
+            "type": "object",
+            "description": "Fatos de origem (ids/source/severity/kind). detail.id entra na chave de dedupe (agent, code, detail.id).",
+            "properties": { "id": { "type": ["string", "null"] } }
+          }
+        }
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["premises", "violations", "options"],
+      "properties": {
+        "premises": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "type", "status", "version"],
+            "properties": {
+              "id": { "type": "string" },
+              "type": { "type": "string" },
+              "status": { "type": "string" },
+              "version": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "violations": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "source", "severity", "summary"],
+            "properties": {
+              "id": { "type": "string" },
+              "source": { "type": "string", "enum": ["a4_run", "readiness", "premise_gap", "alcada", "execution"] },
+              "severity": { "type": "string", "enum": ["block", "warn"] },
+              "summary": { "type": "string" }
+            }
+          }
+        },
+        "options": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["rerun_a4_human", "fix_readiness", "open_alcada", "edit_premises", "wait"] }
+        }
+      }
+    },
+    "basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hasRun", "runStatus", "runStale", "requiresFinance", "impactMi", "alcadaMi", "decisionState", "pulseExceptionsCount"],
+      "properties": {
+        "hasRun": { "type": "boolean", "description": "existe run feasible|partial na versão corrente" },
+        "runStatus": { "type": ["string", "null"], "description": "status do run considerado (feasible|partial) ou, sem ele, do último run da versão corrente; null sem run" },
+        "runStale": { "type": "boolean" },
+        "requiresFinance": { "type": "boolean" },
+        "impactMi": { "type": ["number", "null"], "minimum": 0 },
+        "alcadaMi": { "type": ["number", "null"], "minimum": 0 },
+        "decisionState": { "type": "string", "enum": ["pending", "escalated", "approved"] },
+        "pulseExceptionsCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "committedEventId": { "type": ["string", "null"], "format": "uuid" }
+  }
+}

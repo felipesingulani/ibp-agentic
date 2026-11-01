@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ibp-agentic.local/schemas/plan-export.schema.json",
+  "title": "PlanExport (W7 · Task 13)",
+  "description": "Saída JSON de GET /api/plans/approved/export?format=json — só plano aprovado; plan = a4_runs.plan cru menos reasonCandidates. Ver docs/architecture/W7-PLAN-EXPORT-CONTRACT.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["exportVersion", "exportedAt", "planRef", "run", "settings", "plan"],
+  "properties": {
+    "exportVersion": { "const": "w7.v0" },
+    "exportedAt": { "type": "string", "minLength": 1, "description": "ISO 8601 UTC" },
+    "planRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["basis", "scenarioId", "scenarioVersion", "runId", "at"],
+      "properties": {
+        "basis": { "const": "approved" },
+        "scenarioId": { "type": "string", "minLength": 1 },
+        "scenarioVersion": { "type": "integer", "minimum": 1 },
+        "runId": { "type": "string", "minLength": 1 },
+        "at": { "type": ["string", "null"] }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runCode", "status", "startedAt", "finishedAt"],
+      "properties": {
+        "runCode": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["feasible", "partial"] },
+        "startedAt": { "type": ["string", "null"] },
+        "finishedAt": { "type": ["string", "null"] }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "uom"],
+      "properties": {
+        "currency": { "type": ["string", "null"] },
+        "uom": { "type": ["string", "null"] }
+      }
+    },
+    "plan": {
+      "description": "a4_runs.plan como gravado (PlanOut + params); única remoção: reasonCandidates.",
+      "type": ["object", "null"],
+      "not": { "required": ["reasonCandidates"] }
+    }
+  }
+}

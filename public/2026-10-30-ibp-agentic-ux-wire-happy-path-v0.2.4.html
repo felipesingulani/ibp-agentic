@@ -1,0 +1,1165 @@
+<!--
+  Domain Rewire OS / IBP Agentic — Wire médio-fi do happy path (Sales)
+  Versão: v0.2.4 · 2026-10-30 · Autor: Didi (UX) · Base: spec 2026-10-29-ibp-agentic-domain-rewire-design.md (§6, §7.1–7.4)
+  Âncora: ditado "Abrir filial porte semelhante à Y, curva natural, investimento Z."
+  Fluxo: 1 Ditado → 2 Premissas → 3 Cenário → 4 Otimizador (A4) → 5 Takeaways (A7) + Cockpit (≤3 cenários)
+
+  CHANGELOG
+  v0.2.4 (2026-10-30, PO — fecha o loop (B)↔A7↔W3: DecisionEvent v0.2 no cockpit; pair: wizard 0.2.4 ↔ shell 0.3.7)
+    - 0.2.3 (green QA) congelado; 0.2.2 / v0.2 / happy-path.html intactos. Fluxo, estados A4, fail-closed e regra do porquê
+      (≥ 1 sempre; ≥ 20 só warn/block/parcial) iguais ao 0.2.3.
+    - DecisionEvent agora usa os opcionais do schema v0.2 (contracts/decision-event.schema.json, additionalProperties:false):
+      · impactMi  = investimento avaliado (PC-0142-03.capex em mi) — no cenário em análise (SCN-0142).
+      · alcadaMi  = limiar vigente na decisão; 0 quando fail-closed sem limiar ("none"); null só no fail-open (POL-04 fora do pack).
+      · escalateTo = "finance" (Sales acima da alçada) | "domain_owner" (infactível, escalar comum ou Finance escalando).
+        Omitido no approve. Cenários de comparação (≠ SCN-0142) não têm investimento no wire → só escalateTo.
+    - Fila (localStorage "ibp.alcada.queue") grava o shape do AlcadaQueueItem do schema: name + impactMi (não mais nome/invMi),
+      alcadaMi number (0 fail-closed), policyRef {id, version}, status, escalateTo, events, createdAt/updatedAt; sem noPolicy/source.
+      policyRef.version vem de "ibp.alcada.polref" (espelho novo do shell 0.3.6); sem espelho = {POL-04, 1}. Leitura da fila no
+      wizard aceita alias legado (nome/invMi de itens do 0.2.3).
+    - Finance no wizard: Aprovar fecha o item como approved_finance (como 0.2.3); Escalar agora fecha como escalated_owner com
+      escalateTo domain_owner (antes não tocava a fila).
+    - Links do Cadastro/Pulse → shell v0.3.7 (Pulse W3 + Visões W3). Gaveta de contrato: DecisionEvent v0.2 + AlcadaQueueItem (schema);
+      saiu o "proposta só no drawer".
+  v0.2.3 · repoint pós-green (B) (2026-10-30, PO): links do shell 0.3.4 → 0.3.5 (industry pack). Sem bump; 0.2.2 intacto.
+  v0.2.3 · patch PO porquê (Task 7, 2026-10-30): porquê SEMPRE não-vazio no V0 (≥ 1 caractere) ao Aprovar e ao Escalar.
+    ≥ 20 caracteres só se o run tiver razão warn/block ou for factível parcial. Factível limpo (?a4=clean) = curto, mas não
+    vazio. Removidos o afrouxamento "porquê opcional" e o texto de sistema "(sem porquê — factível sem razões…)"; why do
+    DecisionEvent é sempre o texto do usuário (minLength 1 do schema atendido sem exceção).
+  v0.2.3 · patch PO fail-closed (2026-10-30, decisão PO + alinhamento Deivid; edição in-place, sem bump — QA no retest)
+    - FAIL-CLOSED: sem alçada publicada ≡ alçada {$} 0. Vale para "ibp.alcada.mi" = "none" (POL-04 ausente/arquivada OU
+      publicada sem limiar) e para override "sem política". Investimento > 0 e papel Sales → salesBlocked: Aprovar off
+      (e recusado em decide()), CTA primário "Escalar para Finance" (vai para ibp.alcada.queue com alcadaMi 0) ou
+      configurar em Cadastro · Políticas · Alçadas. Banner #decAlcada: "Sem alçada publicada = alçada 0 · configure no
+      Cadastro". Headline A7 e takeaway de investimento passam a recomendar escalar. Fail-open só no caso abaixo.
+    - Único fail-open (PO/Deivid): POL-04 FORA do pack do tenant → "ibp.alcada.mi" = "outofpack" (shell 🧪 "POL-04 fora
+      do pack" ou pack sem POL-04 no shell v0.3.5), override 🧪 "fora do pack" ou ?alcada=outofpack. Banner warn explica
+      que o tenant não usa alçada; Aprovar segue a regra do porquê. Qualquer outro "sem alçada" = closed.
+  v0.2.3 (2026-10-30, fila PO (B) — alçada Finance numa wire só: Cadastro·Alçadas → gate cockpit → Pulse fila; par = shell v0.3.4)
+    - 0.2.2 congelado (e v0.2.html / happy-path.html, cópias dele). Fluxo feliz, estados A4 e regra do porquê iguais ao 0.2.2.
+    - Gate de alçada no cockpit (só no cenário em análise SCN-0142): investimento = PC-0142-03.capex ({$} 4,2 mi no demo)
+      vs. alçada lida do shell (localStorage "ibp.alcada.mi", espelho da POL-04 publicada; sem shell aberto = default {$} 2 mi).
+      · invest > alçada e papel Sales → banner "Acima da alçada Finance (X > Y) — Sales não aprova; escalar para Finance.",
+        "Aprovar" desabilitado (e recusado em decide()), CTA primário vira "Escalar para Finance".
+      · Escalar grava DecisionEvent {action:"escalate", actor.role:"sales"} (schema contracts/decision-event.schema.json, sem
+        campos extras) e faz append em localStorage "ibp.alcada.queue" com status pending_finance → aparece no Pulse do shell.
+      · invest ≤ alçada OU papel simulado Finance → aprovação segue a regra do porquê (≥ 1 sempre; ≥ 20 se warn/block/
+        parcial — patch Task 7). Finance aprovando aqui fecha o item da fila como approved_finance.
+      · [substituído pelo patch fail-closed acima] Sem política de alçada publicada → era fail-open (não bloqueava).
+      · Fila → wizard: item pending/approved/escalated da mesma versão volta para o cockpit (banner + botões travados);
+        editar premissa depois de escalar marca o item da versão anterior como stale.
+    - Headline A7 e takeaway de investimento usam a alçada vigente (não mais "> {$} 2 mi" fixo).
+    - Painel 🧪 ganha "Alçada Finance (B)": papel Sales|Finance, alçada do shell | override 2 / 5 / sem política, limpar fila.
+      URL: ?alcada=over|under|none (over = 2 mi, under = 5 mi) e ?role=finance. Sem workspace Finance no wizard.
+    - Links para o Cadastro agora apontam para o shell v0.3.4. Gaveta de contrato: DecisionEvent + proposta (só aqui).
+  v0.2.2 (2026-10-30, fila PO (A) — estados/erro do wizard vs A4; prioridade PO: readiness · invalid_reference · capacity gap)
+    - Happy path feliz intacto (sim = ready é o default e se comporta igual ao 0.2.1).
+    - (P1) A4 bloqueado por prontidão: antes do run o wizard lê a prontidão (espelho de GET /api/a4-readiness, W1b:
+      policy | node_capacity | route | supplier_contract, ok|falta|n/a, state ok|block). Se block → tela 4 mostra erro
+      claro + checklist + link por item para o Cadastro do shell v0.3.2 (#cadastro/politicas|rede|logistica|contratos);
+      nenhum run é criado, takeaways travados. Etapa 3 já avisa no CTA.
+    - (P2) Gap sem nó current → linguagem invalid_reference/stable_id: "nó current obrigatório". Cobre null E ref
+      não-current (linha-versão "CD3@v1" ou nó aposentado "CD4") — mesma regra do 400 invalid_reference da W1a.
+    - (P3) Capacity gap: Gap PC-0142-04 aberto (CD3) → razão kind capacidade severity block, "factível parcial",
+      banner dedicado na tela 4 com volta pro cartão do Gap; aprovação só com justificativa explícita; A7 recomenda escalar.
+    - Infactível: run completa, razões block, plano NÃO aprovável (Aprovar desabilitado), takeaways pedem escalar.
+    - Warn: razões só warn → "factível c/ restrições"; aprovar exige porquê citando a restrição (≥ 20 caracteres).
+    - Regra PO (2026-10-30) do porquê ao aprovar: ≥ 20 caracteres sempre que o run tiver alguma razão severity warn
+      (inclui happy path factível com warns e factível parcial) — audit de "vi e aprovei". [substituído pelo patch Task 7:
+      não há mais porquê opcional; clean exige ≥ 1.] Escalar continua exigindo porquê. Novo estado
+      simulado "clean" (?a4=clean / simA4("clean")) = feasible sem razões. Helpers whyRule(run) / runHasWarn(run).
+    - Falha técnica: timeout do solver no meio do run → status erro técnico, código, nada persistido, botão Tentar de novo.
+    - Premissa stale reforçado: editar premissa após run registra "RUN-x invalidado" no audit, banner na tela 4/3,
+      run em voo é descartado; trocar simulação também invalida o run.
+    - Painel "Simular estado A4" (só no wire, canto inferior esquerdo): ready | blocked | infeasible | warn | tech_error,
+      checkboxes dos itens de prontidão, injetar ref inválida no Gap. Também via URL ?a4=<estado> e window.simA4(<estado>).
+    - Contrato: gaveta ganha A4Readiness, erro técnico e proposta A4RunSummary.status (feasible|partial|infeasible).
+  v0.2.1 (2026-10-30, alinhamento QA ao shell 0.3.1 / capacidade / tenant tokens — achado QA Alta #1)
+    - A4Reason.kind: rename tancagem → capacidade no mock, countsByKind, drill-down e contrato da gaveta
+      (= contracts/a4-reason + a4-run-summary). Payload legado com kind antigo é normalizado (normKind/normCounts,
+      igual ao shell 0.3.1). Label UI via mapa KIND = "capacidade".
+    - Tenant tokens: mini tenantConfig no topo do JS (currency BRL default, uom, capNoun, kpi.serviceKpi/wcKpi/wc/
+      cost/viol, tenant). Copy usa {$} {un} {cap} {svc} {wcp} {wc} {cost} {viol} {tenant}, resolvidos por tk()/applyTk().
+      Nenhum símbolo de moeda nem OTIF/DSI hardwired na UI — OTIF/DSI são só aliases demo do config.
+    - Copy vertical removida: SKUs viram "Item A1/B1/C1… · Família A/B/C", unidade genérica (un), capacidade como
+      substantivo de produto (não "tancagem"), tenant "Unidade demo" (sample BR mantido só como dado de demo).
+    - Sem mudança de fluxo: stepper de 5 etapas, PremiseCard e DecisionEvent/audit intactos.
+  v0.2 (2026-10-30, polish noturno p/ handoff dev)
+    - Severity enum: A4Reason.severity = info|warn|block (Deivid). Badges: info=azul, warn=âmbar, block=vermelho.
+      Sem alta/media/baixa na UI nem no dado. Rótulos de takeaway (escalar / na política / contexto) são UX, não severity.
+    - Contrato eng: gaveta "Contrato V0 (para eng)" com PremiseCard, A4Reason, A4RunSummary (countsByKind),
+      regras de validação, estados por tela e JSON ao vivo do estado do wire. Espelha contracts/*.schema.json.
+    - Estados: ditado vazio (erro inline), A1 interpretando, A4 rodando (fases + CTAs travados), cenário/run
+      desatualizado após editar premissa, Gap sem nodeId (bloqueia cenário), decisão sem porquê (erro no campo).
+    - Polish: tela 5 = recomendação A7 → comparação → bloco de decisão com CTA dominante; Enter no ditado gera
+      premissas (Shift+Enter quebra linha); Esc fecha modal/gaveta; aria-labels/aria-live; rótulos de campo pt-BR.
+    - Bugs: versão do cenário subia antes de existir cenário; run em andamento duplicava com "Re-rodar"; run
+      terminando após edição desbloqueava cockpit com dado velho; "+ Adicionar cenário" duplicava SCN-0145;
+      era possível arquivar o próprio cenário em análise; destaque de campo editado sumia; ditado vazio virava
+      exemplo âncora silenciosamente; valores com aspas quebravam inputs; acesso a cartões por índice fixo.
+  v0.1 (2026-10-30) primeiro wire navegável.
+
+  Contratos usados (V0, Deivid/PO) — formal em ./contracts/*.schema.json:
+  PremiseCard: { id, type: NovaFilial|CurvaDemanda|Investimento|Gap, fields{}, status: ok|gap,
+                 links: { nodeId? }, version, source: ditado|edit }
+  A4Reason:    { rank, kind: janela|capacidade|contrato|custo|outro, summary,
+                 refs: { nodeId?, skuId?, routeId?, period? }, severity: info|warn|block }  + countsByKind{}
+
+  Notas: só UI wire — dados fictícios (placeholders de demo do PO), sem backend. Zero dependências externas.
+  Decisões travadas: Gap = cartão tipado linkado a nó (não texto solto); A4 always-on = top 3 + contagem por kind,
+  drill-down = SKU×rota×período do mesmo run; Cockpit = cash/WC, serviço, custo, #violações; máx. 3 cenários (4º = arquivar/substituir);
+  Tela 5: takeaways do A7 ANTES do seletor de cenários, mesmo canvas. Write-back fora da V0 (só export).
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IBP Agentic — Wire happy path (v0.2.4)</title>
+<style>
+  :root{--bg:#f5f6f8;--card:#fff;--ink:#1d2330;--mute:#5f6777;--line:#dfe2e8;--acc:#2f5bea;--acc2:#e9eefc;
+        --ok:#1f8a4c;--okbg:#e6f4ec;--gap:#c62828;--gapbg:#fdecec;--warn:#9a5b00;--warnbg:#fff4e0;
+        --info:#1f5fae;--infobg:#e8f1fb}
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.45 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+  :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+  header.top{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--line)}
+  .bar{display:flex;align-items:center;gap:16px;padding:10px 24px}
+  .brand{font-weight:700}.brand small{font-weight:400;color:var(--mute);margin-left:8px}
+  .ctx{margin-left:auto;color:var(--mute);font-size:12px}
+  .stepper{display:flex;gap:0;padding:0 24px;border-top:1px solid var(--line)}
+  .step{flex:1;display:flex;align-items:center;gap:8px;padding:10px 8px;cursor:pointer;border-bottom:3px solid transparent;color:var(--mute);background:none;border-top:0;border-left:0;border-right:0;font:inherit;text-align:left}
+  .step .n{width:22px;height:22px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;font-size:12px;background:#fff}
+  .step.active{color:var(--ink);border-bottom-color:var(--acc);font-weight:600}
+  .step.active .n{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .step.done .n{background:var(--okbg);color:var(--ok);border-color:var(--ok)}
+  .step.stale .n{background:var(--warnbg);color:var(--warn);border-color:var(--warn)}
+  .step:disabled{opacity:.45;cursor:not-allowed}
+  main{max-width:1180px;margin:0 auto;padding:24px}
+  section.screen{display:none}section.screen.active{display:block}
+  h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:0 0 10px}
+  .sub{color:var(--mute);margin:0 0 18px;max-width:820px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px}
+  .grid{display:grid;gap:14px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:6px;padding:7px 12px;cursor:pointer;font:inherit}
+  .btn:hover:not(:disabled){border-color:#b9bfcc}.btn.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+  .btn.lg{padding:10px 18px;font-size:15px;font-weight:600}
+  .btn.ghost{border-color:transparent;background:none;color:var(--acc)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  textarea{width:100%;min-height:90px;border:1px solid var(--line);border-radius:6px;padding:10px;font:inherit;resize:vertical}
+  textarea[aria-invalid="true"],input[aria-invalid="true"],select[aria-invalid="true"]{border-color:var(--gap)!important;background:#fffafa}
+  .err{color:var(--gap);font-size:12px;margin-top:4px}
+  .tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:10px;background:#eef0f4;color:#4a5263;border:1px solid var(--line)}
+  .tag.ok{background:var(--okbg);color:var(--ok);border-color:#bfe3cd}
+  .tag.gap{background:var(--gapbg);color:var(--gap);border-color:#f3c2c2}
+  .tag.warn{background:var(--warnbg);color:var(--warn);border-color:#f2d7a6}
+  .tag.agent{background:var(--acc2);color:var(--acc);border-color:#cdd8fb}
+  .mic{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:16px}
+  .mic.rec{background:var(--gapbg);border-color:var(--gap);animation:p 1s infinite}
+  @keyframes p{50%{box-shadow:0 0 0 6px rgba(198,40,40,.12)}}
+  .hint{font-size:12px;color:var(--mute)}
+  kbd{font:11px ui-monospace,Menlo,monospace;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:#fafbfc}
+  .intent{border-left:3px solid var(--acc);padding:6px 10px;background:var(--acc2);border-radius:0 6px 6px 0;margin-top:10px;font-size:13px}
+  .skel{height:12px;border-radius:4px;background:linear-gradient(90deg,#eef0f4 25%,#f7f8fa 50%,#eef0f4 75%);background-size:200% 100%;animation:sk 1.2s infinite;margin:6px 0}
+  @keyframes sk{to{background-position:-200% 0}}
+  /* premise cards */
+  .pcard{border:1px solid var(--line);border-radius:8px;background:#fff;padding:14px;position:relative}
+  .pcard.gap{border-color:var(--gap);box-shadow:inset 4px 0 0 var(--gap)}
+  .pcard.invalid{border-color:var(--gap);border-style:dashed}
+  .pcard header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .pcard header b{font-size:14px}
+  .pcard .meta{margin-left:auto;display:flex;gap:6px}
+  .field{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:8px;padding:4px 0;border-bottom:1px dashed #eceef2}
+  .field label{color:var(--mute);font-size:12px}
+  .field input,.field select{border:1px solid transparent;border-radius:4px;padding:4px 6px;font:inherit;background:transparent;width:100%}
+  .field input:hover,.field select:hover{border-color:var(--line)}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--acc);background:#fff}
+  .field input.edited,.field select.edited{background:#fffbe6}
+  .pcard footer{display:flex;gap:8px;align-items:center;margin-top:10px;font-size:12px;color:var(--mute);flex-wrap:wrap}
+  .link{color:var(--acc);cursor:pointer;text-decoration:underline dotted;background:none;border:0;padding:0;font:inherit}
+  pre.json{background:#0f1420;color:#cfe3ff;font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;border-radius:6px;padding:10px;overflow:auto;max-height:260px;margin:8px 0 0;white-space:pre}
+  .pcard pre.json{display:none}.pcard pre.json.show{display:block}
+  .alert{padding:10px 12px;border-radius:6px;font-size:13px}
+  .alert.gap{background:var(--gapbg);color:var(--gap);border:1px solid #f3c2c2}
+  .alert.ok{background:var(--okbg);color:var(--ok);border:1px solid #bfe3cd}
+  .alert.warn{background:var(--warnbg);color:var(--warn);border:1px solid #f2d7a6}
+  .alert.info{background:var(--infobg);color:var(--info);border:1px solid #c7dbf3}
+  .alert .btn{margin-left:8px}
+  /* tables */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--mute);font-weight:600}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .chart{display:flex;align-items:flex-end;gap:4px;height:120px;padding:6px 0;border-bottom:1px solid var(--line)}
+  .chart .b{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:1px}
+  .chart .b i{display:block;background:#c9d3ee}.chart .b i.new{background:var(--acc)}
+  .chart-x{display:flex;gap:4px;font-size:10px;color:var(--mute)}.chart-x span{flex:1;text-align:center}
+  .legend{display:flex;gap:12px;font-size:12px;color:var(--mute);margin-top:6px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:10px;height:10px;margin-right:4px;vertical-align:-1px}
+  .trace{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--mute);flex-wrap:wrap}
+  .trace span{padding:3px 8px;border:1px solid var(--line);border-radius:4px;background:#fff}
+  /* optimizer */
+  .progress{height:6px;background:#eef0f4;border-radius:3px;overflow:hidden;margin:10px 0}
+  .progress i{display:block;height:100%;width:0;background:var(--acc);transition:width .2s}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{border:1px solid var(--line);border-radius:16px;padding:4px 10px;background:#fff;cursor:pointer;font:inherit;font-size:12px}
+  .chip b{margin-left:4px}.chip.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .reason{display:grid;grid-template-columns:34px 1fr auto;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);align-items:start}
+  .reason .rk{width:28px;height:28px;border-radius:50%;background:#eef0f4;display:grid;place-items:center;font-weight:700}
+  .sev{font:600 11px/1 ui-monospace,Menlo,monospace;padding:4px 7px;border-radius:10px;border:1px solid transparent}
+  .sev.info{background:var(--infobg);color:var(--info);border-color:#c7dbf3}
+  .sev.warn{background:var(--warnbg);color:var(--warn);border-color:#f2d7a6}
+  .sev.block{background:var(--gapbg);color:var(--gap);border-color:#f3c2c2}
+  .refs{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap}.refs code{font-size:11px;background:#f3f4f7;padding:1px 6px;border-radius:4px;border:1px solid var(--line)}
+  details.drill{margin-top:14px;border:1px solid var(--line);border-radius:8px;background:#fff}
+  details.drill summary{padding:12px 16px;cursor:pointer;font-weight:600}
+  details.drill .in{padding:0 16px 16px}
+  .kpi{display:flex;flex-direction:column}.kpi b{font-size:18px}.kpi small{color:var(--mute)}
+  /* tela 5 */
+  .reco{border-left:5px solid var(--acc);padding:18px 20px}
+  .reco.esc{border-left-color:var(--gap)}.reco.ok{border-left-color:var(--ok)}
+  .reco .headline{font-size:16px;font-weight:600;margin:8px 0 6px}
+  .take{display:grid;grid-template-columns:24px 1fr auto;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+  .take:last-child{border-bottom:0}
+  .take .ic{font-weight:700}
+  .scn{border:1px solid var(--line);border-radius:8px;background:#fff;padding:14px;position:relative;cursor:pointer}
+  .scn:hover{border-color:#b9bfcc}
+  .scn.sel{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc2)}
+  .scn h3{margin:0 0 2px;font-size:14px}.scn .v{font-size:11px;color:var(--mute)}
+  .kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed #eceef2;gap:8px}
+  .kv span{color:var(--mute)}.kv b{font-variant-numeric:tabular-nums}
+  .best{color:var(--ok)}.worst{color:var(--gap)}
+  .decision{margin-top:14px;border:2px solid var(--acc);background:#fbfcff}
+  .decision textarea{min-height:64px}
+  .audit{font-size:12px}.audit li{padding:5px 0;border-bottom:1px dashed #eceef2;list-style:none}
+  .audit ul{padding:0;margin:0}.audit time{color:var(--mute);margin-right:8px;font-variant-numeric:tabular-nums}
+  .modal{position:fixed;inset:0;background:rgba(15,20,32,.4);display:none;place-items:center;z-index:50}
+  .modal.show{display:grid}.modal .card{width:480px;max-width:calc(100vw - 32px)}
+  .footer-nav{display:flex;justify-content:space-between;margin-top:22px;gap:10px;align-items:center}
+  .note{font-size:11px;color:var(--mute);border:1px dashed #c9ced8;border-radius:6px;padding:6px 10px;margin-top:10px}
+  .note::before{content:"WIRE NOTE · ";font-weight:700}
+  /* contract drawer */
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100vw);background:#fff;border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(15,20,32,.12);z-index:60;transform:translateX(105%);transition:transform .2s;display:flex;flex-direction:column}
+  .drawer.show{transform:none}
+  .drawer .dh{display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--line)}
+  .drawer .db{overflow:auto;padding:12px 18px 24px}
+  .drawer details{border:1px solid var(--line);border-radius:8px;margin:10px 0}
+  .drawer summary{padding:10px 12px;cursor:pointer;font-weight:600}
+  .drawer details>div{padding:0 12px 12px}
+  .drawer ul{margin:6px 0;padding-left:18px}.drawer li{margin:3px 0}
+  .drawer pre.json{white-space:pre-wrap;word-break:break-word;max-height:none}
+  .drawer code{font-size:12px;background:#f3f4f7;padding:0 4px;border-radius:3px}
+  /* v0.2.2 sim panel + A4 states */
+  .simp{position:fixed;left:12px;bottom:12px;z-index:40;background:#fff;border:2px dashed #9aa3b5;border-radius:8px;box-shadow:0 4px 16px rgba(15,20,32,.12);max-width:330px;font-size:12px}
+  .simp summary{padding:8px 12px;cursor:pointer;font-weight:700}
+  .simp .in{padding:0 12px 12px}
+  .simp label{display:flex;gap:6px;align-items:center;padding:2px 0}
+  .simp fieldset{border:1px solid var(--line);border-radius:6px;margin:6px 0;padding:6px 8px}
+  .simp legend{font-weight:600;padding:0 4px}
+  .rlist{list-style:none;padding:0;margin:8px 0}
+  .rlist li{display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px dashed #eceef2}
+  .rlist li .sp{flex:1}
+  .alert h3{margin:0 0 4px;font-size:14px}
+  /* v0.2.3 alçada (v0.2.4: DecisionEvent v0.2) */
+  #decAlcada b{display:block}
+  .simp .sub{font-size:11px;color:var(--mute);margin-top:4px}
+  .srOnly{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="bar">
+    <div class="brand">Domain Rewire OS <small>IBP Agentic · wire v0.2.4 · pair shell 0.3.7</small></div>
+    <span class="tag agent">Perna: Sales (A1)</span>
+    <div class="ctx">Ciclo IBP Nov/26 · horizonte 18 meses · tenant: {tenant} · moeda {cur}</div>
+    <button class="btn" id="openContract" aria-controls="contract" aria-expanded="false" aria-label="Abrir contrato V0 para engenharia">{ } Contrato V0 (para eng)</button>
+  </div>
+  <nav class="stepper" id="stepper" aria-label="Etapas do fluxo"></nav>
+</header>
+
+<main>
+<!-- ============ 1. DITADO ============ -->
+<section class="screen active" id="s1" aria-labelledby="h1-1">
+  <h1 id="h1-1">1 · Ditado</h1>
+  <p class="sub">Diga ou escreva o que quer simular. O A1 (Sales) transforma em premissas que você revisa — nada vira plano sem sua revisão.</p>
+  <div class="grid g2">
+    <div class="card">
+      <h2><label for="dict">O que você quer simular?</label></h2>
+      <div class="row" style="align-items:flex-start">
+        <button class="mic" id="mic" aria-label="Ditar por voz (simulado)" title="Ditar por voz (simulado)">🎙</button>
+        <div style="flex:1">
+          <textarea id="dict" aria-describedby="micHint dictErr" placeholder="Ex.: Abrir filial porte semelhante à Campinas, curva natural, investimento de {$} 4,2 milhões."></textarea>
+          <div class="hint" id="micHint">Use o microfone ou digite. <kbd>Enter</kbd> gera premissas · <kbd>Shift</kbd>+<kbd>Enter</kbd> quebra linha.</div>
+          <div id="dictErr" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="gen" aria-label="Gerar premissas a partir do ditado">Gerar premissas</button>
+        <button class="btn ghost" id="fill" aria-label="Preencher com o exemplo âncora">Usar exemplo</button>
+      </div>
+      <div id="intentBox" aria-live="polite"></div>
+    </div>
+    <div class="card">
+      <h2>Dados que o A1 vai usar</h2>
+      <table>
+        <tr><th>Fonte</th><th>Recorte</th><th>Atualizado</th></tr>
+        <tr><td>Histórico de vendas</td><td>36 meses · 14 filiais · 1.240 SKUs</td><td>28/10</td></tr>
+        <tr><td>Rede / nós</td><td>3 CDs (CD1 Jundiaí, CD2 Contagem, CD3 Uberlândia)</td><td>15/10</td></tr>
+        <tr><td>Políticas</td><td>Estoque seg. 18 dias · {svc} ≥ 95% · {wcp} ≤ 45</td><td>01/10</td></tr>
+        <tr><td>Contratos fornecedores</td><td>Grupo A (take-or-pay), Grupo B</td><td>20/09</td></tr>
+      </table>
+      <div class="note">Mostrar os dados antes de gerar calibra expectativa (HAX G1/G2). Sem chat livre: o input é uma intenção, não conversa.</div>
+    </div>
+  </div>
+  <div class="footer-nav"><span></span><button class="btn" data-go="2" id="next1" disabled aria-label="Ir para revisão de premissas">Revisar premissas →</button></div>
+</section>
+
+<!-- ============ 2. PREMISSAS ============ -->
+<section class="screen" id="s2" aria-labelledby="h1-2">
+  <h1 id="h1-2">2 · Premissas</h1>
+  <p class="sub">Cartões gerados do ditado. Edite direto no campo: cada edição sobe a <b>versão</b> do cartão e marca a origem como <b>edit</b>. Gap precisa estar ligado a um nó da rede.</p>
+  <div id="gapBanner" aria-live="polite"></div>
+  <div class="grid g2" id="cards" style="margin-top:12px"></div>
+  <div class="note">Gap é cartão (type Gap) com links.nodeId obrigatório — clicável até o nó. Nunca texto solto. “Ver JSON” existe só no wire, para alinhar com o schema.</div>
+  <div class="footer-nav"><button class="btn" data-go="1">← Ditado</button><span class="hint" id="toScnHint"></span><button class="btn primary" id="toScn" aria-label="Gerar cenário a partir das premissas">Gerar cenário →</button></div>
+</section>
+
+<!-- ============ 3. CENÁRIO ============ -->
+<section class="screen" id="s3" aria-labelledby="h1-3">
+  <h1 id="h1-3">3 · Cenário</h1>
+  <p class="sub">Séries geradas das premissas, ancoradas no histórico da filial semelhante. Toda mudança de premissa cria nova versão.</p>
+  <div id="staleBanner" aria-live="polite"></div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="row"><b id="scnTitle">SCN-0142 · Abrir filial Ribeirão Preto</b><span class="tag" id="scnVer">v1</span><span class="tag agent">A1 Sales</span><span class="tag agent">A3 Finance</span>
+      <div style="margin-left:auto" class="trace" id="trace"></div></div>
+  </div>
+  <div class="grid g2">
+    <div class="card">
+      <h2>Demanda incremental ({un}/mês) — nova filial</h2>
+      <div class="chart" id="chart" role="img" aria-label="Gráfico de demanda: base da rede e incremento da FL-RIB por mês"></div><div class="chart-x" id="chartX"></div>
+      <div class="legend"><span><i style="background:#c9d3ee"></i>Base (rede atual)</span><span><i style="background:var(--acc)"></i>Incremento FL-RIB</span></div>
+    </div>
+    <div class="card">
+      <h2>Resumo do cenário</h2>
+      <div class="grid g3" id="scnKpis" style="margin-bottom:12px"></div>
+      <table id="scnTable"></table>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h2>Versões</h2>
+    <table id="verTable"></table>
+  </div>
+  <div class="note">Cenário ≠ lista de desejos (spec §7.2): o CTA principal é rodar o A4. Sem otimização, o cenário não chega ao cockpit.</div>
+  <div class="footer-nav"><button class="btn" data-go="2">← Premissas</button><span class="hint" id="toOptHint" aria-live="polite"></span><button class="btn primary" id="toOpt" aria-label="Rodar otimizador A4 neste cenário">Rodar otimizador (A4) →</button></div>
+</section>
+
+<!-- ============ 4. OTIMIZADOR ============ -->
+<section class="screen" id="s4" aria-labelledby="h1-4">
+  <h1 id="h1-4">4 · Otimizador (A4)</h1>
+  <p class="sub">Plano factível respeitando rotas, janelas, capacidade, custos e contratos. Sempre visível: 3 principais razões + contagem por tipo. Detalhe SKU × rota × período no drill-down do mesmo run.</p>
+  <div id="a4State" aria-live="polite"></div>
+  <div class="card">
+    <div class="row"><b id="runId">RUN-A4-—</b><span class="tag" id="runStatus" role="status" aria-live="polite">aguardando</span><span class="hint" id="runMeta"></span>
+      <button class="btn" style="margin-left:auto" id="rerun" aria-label="Rodar o otimizador novamente">Rodar de novo</button></div>
+    <div class="progress" role="progressbar" aria-label="Progresso do otimizador" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progBar"><i id="prog"></i></div>
+    <div class="hint" id="runPhase" aria-live="polite"></div>
+    <div class="grid g4" id="optKpis" style="margin-top:8px"></div>
+  </div>
+  <div class="card" style="margin-top:14px" id="reasonsCard" hidden>
+    <div class="row" style="margin-bottom:6px"><h2 style="margin:0">Por que o plano não atende 100%</h2>
+      <span class="hint">Contagem por tipo — clique para filtrar o drill-down</span>
+      <span class="legend" style="margin:0 0 0 auto" aria-label="Legenda de severidade"><span class="sev info">info</span><span class="sev warn">warn</span><span class="sev block">block</span></span></div>
+    <div class="chips" id="chips" role="group" aria-label="Filtrar por tipo de razão"></div>
+    <div id="reasons" style="margin-top:6px"></div>
+  </div>
+  <details class="drill" id="drill" hidden>
+    <summary>Drill-down · SKU × rota × período <span class="hint" id="drillCount"></span></summary>
+    <div class="in"><table id="drillTable"></table></div>
+  </details>
+  <div class="note">“Ver no drill-down” abre o painel filtrado pelo tipo da razão. severity <code>block</code> = candidata a escalonamento pelo A5/A7.</div>
+  <div class="footer-nav"><button class="btn" data-go="3">← Cenário</button><button class="btn primary" id="toCk" disabled aria-label="Ver takeaways do A7 e comparar cenários">Ver takeaways e comparar →</button></div>
+</section>
+
+<!-- ============ 5. TAKEAWAYS + COCKPIT ============ -->
+<section class="screen" id="s5" aria-labelledby="h1-5">
+  <h1 id="h1-5">5 · Takeaways + Cockpit</h1>
+  <p class="sub">Primeiro a leitura do A7 (Integrator); depois a comparação de até 3 cenários; por fim, a decisão.</p>
+
+  <div class="card reco" id="recoCard">
+    <div class="row"><span class="tag agent">A7 · Integrator</span><span class="hint">base: SCN-0142 v<span class="vv">1</span> · <span id="recoRun">RUN-A4</span> · checagem A5</span></div>
+    <div class="headline" id="recoHeadline"></div>
+    <div id="takeaways"></div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <div class="row" style="margin-bottom:12px"><h2 style="margin:0">Comparação de cenários <span class="hint">(máx. 3 · verde = melhor, vermelho = pior por KPI)</span></h2>
+      <button class="btn" style="margin-left:auto" id="add4" aria-label="Adicionar cenário à comparação">+ Adicionar cenário</button></div>
+    <div class="grid g3" id="scns" role="radiogroup" aria-label="Cenário para decidir"></div>
+  </div>
+
+  <div class="card decision" id="decisionCard" aria-labelledby="decH">
+    <div class="row"><h2 id="decH" style="margin:0">Decisão</h2><span class="hint">sobre <b id="selName">Abrir filial Y</b> <span id="selVer"></span></span></div>
+    <div id="decWarn" style="margin-top:8px"></div>
+    <label for="why" class="hint" style="display:block;margin-top:10px">Por quê? <b id="whyReq">(obrigatório)</b> — fica no audit trail junto da decisão.</label>
+    <textarea id="why" aria-describedby="whyErr" placeholder="Ex.: Aprovo com CD1 complementando; Finance valida o capex na reunião de 05/11."></textarea>
+    <div id="whyErr" aria-live="polite"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn primary lg" id="decide" aria-label="Aprovar plano do cenário selecionado e gerar export">Aprovar plano e gerar export</button>
+      <button class="btn" id="escalate" aria-label="Escalar decisão para o domain owner">Escalar para domain owner</button>
+      <span class="hint" style="margin-left:auto">Sem write-back na V0: aprovar = registrar + exportar.</span>
+    </div>
+    <div id="decMsg" style="margin-top:10px" aria-live="polite"></div>
+  </div>
+
+  <div class="card audit" style="margin-top:14px">
+    <h2>Audit trail</h2><ul id="audit"></ul>
+  </div>
+  <div class="note">Write-back fora da V0: “Aprovar” registra decisão + gera export. Melhor/pior por KPI em verde/vermelho para ler rápido sem virar planilha.</div>
+  <div class="footer-nav"><button class="btn" data-go="4">← Otimizador</button><span></span></div>
+</section>
+</main>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalH"><div class="card">
+  <h2 id="modalH">Limite de 3 cenários na comparação</h2>
+  <p class="hint" style="margin-top:0">Para incluir <b>“Fornecedor B +2 dias”</b>, escolha qual sai. O cenário arquivado continua no histórico e no audit trail.</p>
+  <div id="modalList"></div>
+  <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" id="mCancel">Cancelar <span class="hint">(Esc)</span></button></div>
+</div></div>
+
+<details class="simp" id="simPanel">
+  <summary>🧪 Simular estado A4 <span class="tag" id="simTag">ready</span> <span class="tag" id="alcTag">alçada</span></summary>
+  <div class="in">
+    <div class="hint">Só no wire (QA/PO). Trocar o estado invalida o run atual. URL: <code>?a4=blocked</code></div>
+    <fieldset><legend>Resultado do A4</legend>
+      <label><input type="radio" name="sim" value="ready" checked> ready <span class="hint">— real (gap aberto = capacity gap)</span></label>
+      <label><input type="radio" name="sim" value="blocked"> blocked <span class="hint">— prontidão falha</span></label>
+      <label><input type="radio" name="sim" value="infeasible"> infeasible <span class="hint">— razões block</span></label>
+      <label><input type="radio" name="sim" value="warn"> warn <span class="hint">— razões warn</span></label>
+      <label><input type="radio" name="sim" value="clean"> clean <span class="hint">— feasible, reasons vazio</span></label>
+      <label><input type="radio" name="sim" value="tech_error"> tech_error <span class="hint">— timeout solver</span></label>
+    </fieldset>
+    <fieldset id="simReady"><legend>Itens de prontidão (blocked)</legend>
+      <label><input type="checkbox" data-rk="policy"> policy ok</label>
+      <label><input type="checkbox" data-rk="node_capacity" checked> node_capacity ok</label>
+      <label><input type="checkbox" data-rk="route"> route ok</label>
+      <label><input type="checkbox" data-rk="supplier_contract"> supplier_contract ok</label>
+      <label><input type="checkbox" id="simSupply"> supply externo no escopo</label>
+    </fieldset>
+    <fieldset><legend>Gap / stable_id</legend>
+      <div class="row"><button class="btn" id="simBadRef" type="button">Gap → CD3@v1 (linha-versão)</button><button class="btn" id="simNullRef" type="button">Gap → sem nó</button></div>
+    </fieldset>
+    <fieldset id="simAlc"><legend>Alçada Finance (B)</legend>
+      <div class="hint">Papel de quem decide no cockpit</div>
+      <label><input type="radio" name="simRole" value="sales" checked> Sales <span class="hint">— default (perna A1)</span></label>
+      <label><input type="radio" name="simRole" value="finance"> Finance <span class="hint">— aprova acima da alçada</span></label>
+      <div class="hint" style="margin-top:6px">Alçada vigente</div>
+      <label><input type="radio" name="simAlcV" value="shell" checked> do shell <span class="hint">— ibp.alcada.mi</span></label>
+      <label><input type="radio" name="simAlcV" value="2"> override {$} 2 mi <span class="hint">— over</span></label>
+      <label><input type="radio" name="simAlcV" value="5"> override {$} 5 mi <span class="hint">— under</span></label>
+      <label><input type="radio" name="simAlcV" value="none"> override sem política <span class="hint">— ≡ {$} 0 (fail-closed)</span></label>
+      <label><input type="radio" name="simAlcV" value="outofpack"> override POL-04 fora do pack <span class="hint">— único fail-open</span></label>
+      <div class="sub" id="simAlcInfo"></div>
+      <div class="row" style="margin-top:6px"><button class="btn" id="simQClear" type="button">Limpar fila (ibp.alcada.queue)</button></div>
+      <div class="sub">URL: <code>?alcada=over|under|none|outofpack</code> · <code>?role=finance</code>. Override não grava no shell.</div>
+    </fieldset>
+  </div>
+</details>
+
+<aside class="drawer" id="contract" role="dialog" aria-modal="false" aria-labelledby="contractH" aria-hidden="true">
+  <div class="dh"><h2 id="contractH" style="margin:0">Contrato V0 (para eng)</h2><span class="tag">v0.2.4</span>
+    <button class="btn" style="margin-left:auto" id="closeContract" aria-label="Fechar contrato">Fechar <span class="hint">(Esc)</span></button></div>
+  <div class="db">
+    <p class="hint" style="margin-top:0">Fonte formal: <code>contracts/premise-card.schema.json</code>, <code>a4-reason.schema.json</code>, <code>a4-run-summary.schema.json</code> (JSON Schema 2020-12, Deivid). Este painel é o espelho UX — se divergir, vale o schema.</p>
+
+    <details open><summary>PremiseCard</summary><div>
+<pre class="json">{
+  "id": "PC-0142-04",                 // string, obrigatório
+  "type": "NovaFilial | CurvaDemanda | Investimento | Gap",
+  "fields": { "...": "..." },          // mapa por type (V0: validado na app)
+  "status": "ok | gap",
+  "links": { "nodeId": "CD3" },       // string | null — OBRIGATÓRIO se type = Gap
+  "version": 1,                       // int ≥ 1; +1 a cada edição
+  "source": "ditado | edit"           // vira "edit" na 1ª edição humana
+}</pre>
+    </div></details>
+
+    <details open><summary>A4Reason</summary><div>
+<pre class="json">{
+  "rank": 1,                                   // int ≥ 1 (always-on mostra 1..3)
+  "kind": "janela | capacidade | contrato | custo | outro",   // legado "tancagem" → normalizado p/ "capacidade"
+  "summary": "CD3 excede capacidade em 18%…",    // pt-BR, 1 frase, ≤ 160 chars (UX)
+  "refs": { "nodeId": "CD3", "skuId": null, "routeId": null, "period": "2027-06..2027-09" },
+  "severity": "info | warn | block"            // canônico; legado: baixa→info, media→warn, alta→block
+}</pre>
+      <ul class="hint"><li>UI: <span class="sev info">info</span> azul · <span class="sev warn">warn</span> âmbar · <span class="sev block">block</span> vermelho. O badge mostra o valor do enum, sem tradução.</li>
+      <li>Rótulos de takeaway (<i>escalar</i>, <i>na política</i>, <i>contexto</i>) são do A7/UX — não são severity.</li></ul>
+    </div></details>
+
+    <details open><summary>A4RunSummary (always-on + countsByKind)</summary><div>
+<pre class="json">{
+  "runId": "RUN-A4-3181",
+  "scenarioId": "SCN-0142",
+  "reasons": [ /* A4Reason, maxItems 3, ordenado por rank */ ],
+  "countsByKind": { "janela": 7, "capacidade": 12, "contrato": 3, "custo": 5, "outro": 1 }
+                  // todas as 5 chaves sempre presentes (0 se vazio)
+}</pre>
+      <ul class="hint"><li>Drill-down SKU × rota × período = linhas do <b>mesmo</b> run (filtro por <code>kind</code>), não nova chamada ao solver.</li></ul>
+    </div></details>
+
+    <details><summary>A4Readiness (W1b · GET /api/a4-readiness)</summary><div>
+<pre class="json">{
+  "state": "ok | block",
+  "met": 1, "need": 3, "pct": 33,
+  "items": [
+    { "key": "policy",            "status": "ok | falta | n/a", "required": true,  "entity": "policies",           "by": ["…stable_id"] },
+    { "key": "node_capacity",     "status": "…", "required": true,  "entity": "node_capacity",      "by": [] },
+    { "key": "route",             "status": "…", "required": true,  "entity": "routes",             "by": [] },
+    { "key": "supplier_contract", "status": "n/a", "required": false, "entity": "supplier_contracts", "by": [] }
+  ],
+  "scope": { "supply_external_in_scope": false }
+}</pre>
+      <ul class="hint"><li>Wizard chama antes de criar o run. <code>state=block</code> → nenhum <code>a4_runs</code> criado; tela 4 = erro + link por <code>entity</code> pro Cadastro.</li>
+      <li>Capacidade vem de <code>node_capacity</code> (join por stable_id), nunca de campo no nó (QA #3).</li></ul>
+    </div></details>
+
+    <details><summary>Erros e estados de run A4 (v0.2.2)</summary><div>
+<pre class="json">// Falha técnica (proposta p/ Deivid — sem schema ainda)
+{ "error": "a4_solver_timeout | a4_solver_error", "runId": "RUN-A4-3182",
+  "retryable": true, "detail": "CBC sem resposta em 120 s" }
+
+// Gap com nó não-current (W1a, já no app)
+400 { "error": "invalid_reference", "field": "node_id",
+      "hint": "use o stable_id corrente de nodes" }
+
+// Proposta: A4RunSummary.status
+"status": "feasible | partial | infeasible"
+   feasible   = sem block (pode ter warn)  → aprovar c/ porquê (≥ 1 sempre; ≥ 20 se warn/block/parcial)
+   partial    = ≥1 block, plano existe     → aprovar só c/ justificativa explícita (A7: escalar)
+   infeasible = sem plano viável           → NÃO aprovável; só escalar</pre>
+    </div></details>
+
+    <details><summary>DecisionEvent v0.2 + Fila de alçada (v0.2.4)</summary><div>
+<pre class="json">// contracts/decision-event.schema.json v0.2 (Deivid) — additionalProperties:false; impactMi/alcadaMi/escalateTo opcionais
+// Sales acima da alçada → Escalar para Finance
+{ "id": "DEC-0142-v1-…", "scenarioId": "SCN-0142", "scenarioVersion": 1,
+  "runId": "RUN-A4-3181", "action": "escalate", "why": "Capex 4,2 mi acima da minha alçada…",
+  "actor": { "role": "sales", "userId": null }, "at": "2026-10-30T…Z", "exportRef": null,
+  "impactMi": 4.2, "alcadaMi": 2, "escalateTo": "finance" }
+// Aprovar (Sales dentro da alçada / Finance): impactMi + alcadaMi; escalateTo omitido
+{ …, "action": "approve", "actor": { "role": "finance", "userId": null }, "exportRef": "export/plano_SCN-0142_v1.xlsx",
+  "impactMi": 4.2, "alcadaMi": 2 }
+// Escalar domain owner (infactível · escalar comum · Finance escalando): escalateTo "domain_owner"
+// alcadaMi: limiar vigente · 0 = fail-closed sem limiar · null = POL-04 fora do pack (único fail-open)
+
+// localStorage (handoff wire → shell v0.3.6; em eng = GET /api/alcada/queue · Task 8)
+"ibp.alcada.mi"     = "2" | "5" | "none" | "outofpack"   // escrito pelo shell (POL-04 publicada)
+"ibp.alcada.polref" = { "id": "POL-04", "version": 2 }   // espelho novo do shell 0.3.6 (policyRef do item)
+"ibp.alcada.queue"  = AlcadaQueueItem[]                  // contracts/alcada-queue-item.schema.json
+{ "id": "AQ-0142-v1", "scenarioId": "SCN-0142", "scenarioVersion": 1, "name": "Abrir filial Y",
+  "runId": "RUN-A4-3181", "impactMi": 4.2, "alcadaMi": 2, "policyRef": { "id": "POL-04", "version": 1 },
+  "status": "pending_finance | approved_finance | escalated_owner | stale",
+  "escalateTo": "finance | domain_owner | null", "createdAt": "…", "updatedAt": "…",
+  "events": [ /* DecisionEvent v0.2 (sales escalate → finance approve|escalate) */ ] }</pre>
+      <ul class="hint"><li>Gate: <code>invest &gt; alçada</code> e papel Sales → Aprovar bloqueado, CTA “Escalar para Finance”. ≤ alçada ou Finance → regra do porquê.</li>
+      <li><b>Fail-closed (PO 30/10)</b>: sem alçada publicada (POL-04 ausente ou sem limiar) ≡ alçada <code>0</code> → investimento &gt; 0 bloqueia Aprovar de Sales; só Escalar para Finance ou configurar no Cadastro. Evento e item saem com <code>alcadaMi: 0</code>. Fail-open só com POL-04 fora do pack (<code>alcadaMi: null</code> no evento; nada vai para a fila).</li>
+      <li>Item da fila = mesmo shape do <code>GET /api/alcada/queue</code> (Task 8): <code>name</code>/<code>impactMi</code>. Itens legados do 0.2.3 (<code>nome</code>/<code>invMi</code>) continuam lidos pelo adapter do shell 0.3.6 e pelo cockpit.</li></ul>
+    </div></details>
+
+    <details><summary>tenantConfig (mini, espelho do shell 0.3.1)</summary><div>
+<pre class="json" id="tcJson"></pre>
+      <ul class="hint"><li>Moeda só formata (sem câmbio). OTIF/DSI são <i>aliases demo</i> de <code>kpi.serviceKpi</code>/<code>kpi.wcKpi</code>, não nomes fixos do produto.</li>
+      <li>Fonte de verdade em eng: <code>tenant_settings</code> / <code>tenants.config jsonb</code> (W0/W0.1).</li></ul>
+    </div></details>
+
+    <details><summary>Regras de validação (UI deve impedir)</summary><div><ul>
+      <li><b>Ditado vazio</b> → não chama o A1; erro no campo.</li>
+      <li><b>Gap sem nó current</b> (<code>links.nodeId</code> null, linha-versão ou aposentado) → cartão inválido com linguagem <code>invalid_reference</code> (“nó current obrigatório”); “Gerar cenário” bloqueado.</li>
+      <li><b>Prontidão A4 = block</b> → run não é criado; tela 4 mostra itens em falta com link pro Cadastro.</li>
+      <li><b>Run infactível</b> → “Aprovar” desabilitado; só escalar. <b>Run com razão warn/block ou factível parcial</b> → aprovar exige porquê ≥ 20 caracteres.</li>
+      <li><b>Regra PO (porquê, Task 7)</b> → porquê <b>sempre não-vazio</b> (≥ 1) ao aprovar e ao escalar. Factível limpo (<code>reasons: []</code>) aceita porquê curto; não há aprovação sem porquê.</li>
+      <li><b>Erro técnico</b> → nada persistido; “Tentar de novo” repete o run na mesma versão do cenário.</li>
+      <li><b>Edição de premissa</b> → <code>version+1</code>, <code>source="edit"</code>; se o cenário já existe, cria nova versão do cenário e invalida o run A4 anterior.</li>
+      <li><b>Run A4 em andamento</b> → “Rodar de novo” e “Ver takeaways” travados; resultado de run cuja versão de cenário ficou velha é descartado.</li>
+      <li><b>Cockpit</b> → máx. 3 cenários; o 4º exige arquivar um; o cenário em análise não pode ser arquivado.</li>
+      <li><b>Decisão</b> (aprovar ou escalar) sem “porquê” → bloqueada; com porquê → evento no audit trail.</li>
+    </ul></div></details>
+
+    <details><summary>Estados por tela</summary><div>
+<pre class="json">1 Ditado      vazio → (erro: vazio) → ouvindo → interpretando(A1) → pronto
+2 Premissas   ok | com gap (capacity gap) | inválido(Gap sem nó current · invalid_reference)
+3 Cenário     não gerado → vN → desatualizado (premissa editada após último run)
+4 Otimizador  aguardando → bloqueado(prontidão) | rodando(fases)
+              rodando → factível | factível c/ restrições(warn) | factível parcial(capacity gap/block)
+                      | infactível | erro técnico(retry) | descartado(cenário mudou)
+              qualquer resultado → invalidado (premissa editada depois)
+5 Cockpit     sem decisão → erro(sem porquê) → aprovado | escalado  (infactível: só escalado)</pre>
+    </div></details>
+
+    <details><summary>JSON ao vivo deste wire</summary><div>
+      <button class="btn" id="liveRefresh" aria-label="Atualizar JSON ao vivo">Atualizar</button>
+      <pre class="json" id="liveJson"></pre>
+    </div></details>
+
+    <details><summary>Pontos em aberto p/ Deivid</summary><div><ul class="hint">
+      <li>Versão do cenário não está no <code>A4RunSummary</code> (<code>additionalProperties:false</code>) — o wire mostra “SCN-0142 v2”; sugiro <code>scenarioVersion</code>.</li>
+      <li>A4RunSummary sem <code>status</code> — wire deriva de severity; sugiro <code>status: feasible|partial|infeasible</code> + schema de erro técnico.</li>
+      <li>“Gap exige nodeId” ainda não está no schema — sugiro <code>if type=Gap then links.required=[nodeId], nodeId: string</code>.</li>
+      <li>DecisionEvent v0.2 (Deivid, aplicado): <code>impactMi</code>/<code>alcadaMi</code>/<code>escalateTo</code> agora vão no evento (wire 0.2.4). <code>policyRef</code> segue só no AlcadaQueueItem — se eng quiser no evento, é bump de schema.</li>
+      <li><code>why</code> é <code>minLength:1</code> e a regra PO (Task 7) é alinhada: porquê sempre não-vazio, sem texto de sistema. ≥ 20 (warn/block/parcial) é regra de UI, não do schema.</li>
+      <li>Fila de alçada = <code>contracts/alcada-queue-item.schema.json</code> (Task 8); o wire grava exatamente esse shape.</li>
+    </ul></div></details>
+  </div>
+</aside>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+/* ---------- TENANT CONFIG (mini; mesmo espírito do TC do shell 0.3.1) ----------
+   Tudo que é vertical vem daqui. Copy usa tokens {$} {cur} {un} {cap} {svc} {wcp} {wc} {cost} {viol} {tenant}.
+   Moeda = moeda-base do tenant: só formata, NÃO converte. OTIF/DSI = aliases demo (não são o produto). */
+const CUR={BRL:{sym:"R$",dec:","},USD:{sym:"US$",dec:"."},EUR:{sym:"€",dec:","}};
+const tenantConfig={tenant:"Unidade demo",vertical:"genérica",currency:"BRL",uom:"un",capNoun:"armazenagem",
+  kpi:{serviceKpi:"OTIF",wcKpi:"DSI",wc:"Working capital",cost:"Custo logístico",viol:"Violações de política"}};
+const TOKRE=/\{(\$|cur|un|cap|svc|wcp|wc|cost|viol|tenant)\}/g;
+function tk(str){const c=tenantConfig,m={"$":(CUR[c.currency]||CUR.BRL).sym,cur:c.currency,un:c.uom,cap:c.capNoun,svc:c.kpi.serviceKpi,wcp:c.kpi.wcKpi,wc:c.kpi.wc,cost:c.kpi.cost,viol:c.kpi.viol,tenant:c.tenant};
+  return String(str).replace(TOKRE,(_,k)=>m[k]);}
+const num1=v=>v.toFixed(1).replace(".",(CUR[tenantConfig.currency]||CUR.BRL).dec);
+const money=(v,suf="mi")=>(v<0?"−":"")+tk("{$}")+" "+num1(Math.abs(v))+(suf?" "+suf:"");
+function applyTk(root){const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:n=>/^(SCRIPT|STYLE)$/.test(n.parentNode.nodeName)?2:1});let n;
+  while((n=w.nextNode()))if(n.data.indexOf("{")>-1){const t=tk(n.data);if(t!==n.data)n.data=t;}
+  root.querySelectorAll("[title],[aria-label],[placeholder]").forEach(el=>["title","aria-label","placeholder"].forEach(a=>{const v=el.getAttribute(a);if(v&&v.indexOf("{")>-1)el.setAttribute(a,tk(v));}));}
+
+/* A4Reason.kind — v0.2.1 usa "capacidade" (contracts/a4-reason.schema.json). Payload legado (kind antigo) é normalizado, igual ao shell 0.3.1. */
+const KIND={janela:"janela",capacidade:"capacidade",contrato:"contrato",custo:"custo",outro:"outro"};
+const LEGACY_KIND={tancagem:"capacidade"};
+const normKind=k=>LEGACY_KIND[k]||k;
+function normCounts(c){const o={janela:0,capacidade:0,contrato:0,custo:0,outro:0};for(const [k,v] of Object.entries(c||{})){const n=normKind(k);o[n]=(o[n]||0)+v;}return o;}
+const kLbl=k=>KIND[normKind(k)]||k;
+
+const ANCHOR=tk("Abrir filial porte semelhante à Campinas, curva natural, investimento de {$} 4,2 milhões.");
+const steps=["Ditado","Premissas","Cenário","Otimizador (A4)","Takeaways + Cockpit"];
+const S={unlocked:1,cur:1,scnGenerated:false,scnVersion:1,runSeq:0,running:false,lastRun:null,filter:null,decided:null};
+const audit=[];
+const now=()=>new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+function log(who,what){audit.unshift({t:now(),who,what});renderAudit();}
+const isStale=()=>!!S.lastRun&&S.lastRun.scnVersion!==S.scnVersion;
+
+/* ---------- stepper ---------- */
+function renderStepper(){
+  $("#stepper").innerHTML=steps.map((s,i)=>{const n=i+1;const stale=n===4&&isStale()&&S.unlocked>=3;
+    const cls=[n===S.cur?'active':'',n<S.cur&&n<=S.unlocked?'done':'',stale?'stale':''].join(' ');
+    return `<button class="step ${cls}" ${n>S.unlocked?'disabled':''} data-go="${n}" ${n===S.cur?'aria-current="step"':''} aria-label="Etapa ${n}: ${s}${n>S.unlocked?' (bloqueada)':''}"><span class="n">${n<S.cur&&n<=S.unlocked?'✓':n}</span>${s}</button>`}).join("");
+}
+function go(n){n=+n;if(n>S.unlocked)return;S.cur=n;$$(".screen").forEach(s=>s.classList.toggle("active",s.id==="s"+n));renderStepper();window.scrollTo(0,0);
+  if(n===2)renderCards(); if(n===3)renderScenario();
+  if(n===4&&!S.running&&(!S.lastRun||isStale())){const old=isStale()?S.lastRun:null;runOpt();
+    if(old&&S.running)setA4State(`<div class="alert warn" role="status" id="a4Stale">⟳ ${old.id} (cenário v${old.scnVersion}) foi invalidado porque uma premissa mudou. Rodando o A4 em <b>v${S.scnVersion}</b> — takeaways e cockpit ficam travados até terminar.</div>`);}
+  if(n===5)renderCockpit();}
+document.addEventListener("click",e=>{const g=e.target.closest("[data-go]");if(g&&!g.disabled)go(g.dataset.go);});
+
+/* ---------- 1. ditado ---------- */
+function dictError(msg){const d=$("#dict");d.setAttribute("aria-invalid",msg?"true":"false");
+  $("#dictErr").innerHTML=msg?`<div class="err">${msg} <button class="link" id="errFill">Usar exemplo</button></div>`:"";
+  if(msg)$("#errFill").onclick=()=>{$("#dict").value=ANCHOR;dictError("");$("#dict").focus();};}
+$("#fill").onclick=()=>{$("#dict").value=ANCHOR;dictError("");$("#dict").focus();};
+$("#dict").addEventListener("input",()=>{if($("#dict").value.trim())dictError("");});
+$("#dict").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){e.preventDefault();if(!$("#gen").disabled)$("#gen").click();}});
+$("#mic").onclick=()=>{const m=$("#mic");if(m.classList.contains("rec"))return;m.classList.add("rec");m.setAttribute("aria-label","Ouvindo (simulado)");$("#micHint").textContent="Ouvindo… (simulado)";
+  $("#gen").disabled=true;$("#dict").value="";dictError("");let i=0;const t=setInterval(()=>{$("#dict").value=ANCHOR.slice(0,i+=3);if(i>=ANCHOR.length){clearInterval(t);m.classList.remove("rec");m.setAttribute("aria-label","Ditar por voz (simulado)");
+    $("#micHint").textContent="Transcrição pronta — revise e aperte Enter.";$("#gen").disabled=S.scnGenerated;$("#dict").focus();}},40);};
+$("#gen").onclick=()=>{
+  if(S.scnGenerated)return;
+  if(!$("#dict").value.trim()){dictError("Escreva ou dite o que quer simular.");$("#dict").focus();return;}
+  dictError("");
+  const g=$("#gen");g.disabled=true;g.textContent="A1 interpretando…";g.setAttribute("aria-busy","true");
+  $("#intentBox").innerHTML=`<div class="intent"><b>A1 interpretando o ditado…</b><div class="skel" style="width:80%"></div><div class="skel" style="width:55%"></div></div>`;
+  setTimeout(()=>{
+    cards=seedCards();edited.clear();
+    $("#intentBox").innerHTML=`<div class="intent"><b>Entendi:</b> nova filial (semelhante a FL-CPS) · curva natural · investimento ${money(4.2)}<br><span class="hint">4 premissas geradas · 1 gap: capacidade do CD3 · ~1,8k tokens</span></div>`;
+    g.disabled=false;g.textContent="Gerar novamente";g.removeAttribute("aria-busy");
+    S.unlocked=Math.max(S.unlocked,2);$("#next1").disabled=false;$("#next1").classList.add("primary");
+    renderCards();renderStepper();log("A1 Sales","Ditado convertido em 4 PremiseCards (source: ditado)");
+  },900);
+};
+
+/* ---------- 2. premissas ---------- */
+const typeLbl={NovaFilial:"Nova filial",CurvaDemanda:"Curva de demanda",Investimento:"Investimento",Gap:"Gap"};
+const fieldLbl={nome:"Nome",similarA:"Semelhante a",porte:"Porte",abertura:"Abertura",cdAbastecedor:"CD abastecedor",perfil:"Perfil",rampUpMeses:"Ramp-up (meses)",maturidade:"Maturidade",canibalizacao:"Canibalização",capex:"Capex",estoqueInicial:"Estoque inicial",payback:"Payback",desembolso:"Desembolso",descricao:"Descrição",necessario:"Necessário",disponivel:"Disponível",acaoSugerida:"Ação sugerida"};
+const NODES=["CD1","CD2","CD3","FL-RIB","FL-CPS","FL-SJRP"]; /* stable_ids de nós current */
+const NONCURRENT={"CD3@v1":"linha-versão de CD3","CD4":"nó aposentado"};
+const refErr=id=>!id?"null":NODES.includes(id)?null:"noncurrent";
+const seedCards=()=>JSON.parse(tk(JSON.stringify([
+ {id:"PC-0142-01",type:"NovaFilial",fields:{nome:"FL-RIB Ribeirão Preto",similarA:"FL-CPS Campinas",porte:"M (≈ 1.150 {un}/mês maduro)",abertura:"2027-03",cdAbastecedor:"CD3 Uberlândia"},status:"ok",links:{nodeId:"FL-RIB"},version:1,source:"ditado"},
+ {id:"PC-0142-02",type:"CurvaDemanda",fields:{perfil:"natural (S-curve FL-CPS)",rampUpMeses:"9",maturidade:"100% no mês 12",canibalizacao:"-6% FL-SJRP"},status:"ok",links:{nodeId:"FL-RIB"},version:1,source:"ditado"},
+ {id:"PC-0142-03",type:"Investimento",fields:{capex:"{$} 4.200.000",estoqueInicial:"{$} 1.350.000",payback:"26 meses",desembolso:"60% 2027-01 / 40% 2027-03"},status:"ok",links:{nodeId:null},version:1,source:"ditado"},
+ {id:"PC-0142-04",type:"Gap",fields:{descricao:"Faltou capacidade do CD3 para absorver FL-RIB",necessario:"+1.150 {un}/mês no pico",disponivel:"+640 {un}/mês",acaoSugerida:"Atender parte via CD1 ou ampliar capacidade de {cap} do CD3"},status:"gap",links:{nodeId:"CD3"},version:1,source:"ditado"}
+])));
+let cards=seedCards();
+const edited=new Set();
+const fieldErr={};
+const card=t=>cards.find(c=>c.type===t);
+const gapOpen=()=>cards.some(c=>c.type==="Gap"&&c.status==="gap");
+const invalidCards=()=>cards.filter(c=>c.type==="Gap"&&refErr(c.links.nodeId));
+function renderCards(){
+  const gaps=cards.filter(c=>c.status==="gap").length, inv=invalidCards();
+  let banner="";
+  if(inv.length)banner=`<div class="alert gap" role="alert"><b>✕ invalid_reference · nó current obrigatório</b> — ${inv.map(c=>`${c.id} ${c.links.nodeId?`aponta “${esc(c.links.nodeId)}” (${NONCURRENT[c.links.nodeId]||"não é stable_id current"})`:"está sem nó"}`).join("; ")}. Escolha o stable_id de um nó current da rede para continuar.</div>`;
+  else if(gaps)banner=`<div class="alert warn">⚠ <b>Capacity gap</b> · ${gaps} gap aberto (${cards.filter(c=>c.status==="gap").map(c=>c.id+" · nó "+c.links.nodeId).join(", ")}). Dá para gerar o cenário: o A4 trata o gap como restrição dura (razão capacidade <span class="sev block">block</span>) e o A7 recomenda escalar. Tratar aqui deixa o plano na política.</div>`;
+  else banner=`<div class="alert ok">✓ Premissas sem gap.</div>`;
+  if(S.scnGenerated)banner+=`<div class="alert info" style="margin-top:8px">Cenário SCN-0142 já está em v${S.scnVersion}. Cada edição aqui cria uma nova versão e pede novo run do A4.</div>`;
+  $("#gapBanner").innerHTML=banner;
+  $("#cards").innerHTML=cards.map((c,ci)=>{const rb=c.type==="Gap"?refErr(c.links.nodeId):null,bad=!!rb;return `
+   <div class="pcard ${c.status} ${bad?'invalid':''}" aria-label="Premissa ${typeLbl[c.type]} ${c.id}">
+     <header><b>${typeLbl[c.type]}</b><span class="tag">${c.type}</span>
+       <div class="meta"><span class="tag ${c.status}">${c.status==="gap"?"⚠ gap":"✓ ok"}</span><span class="tag" title="version">v${c.version}</span><span class="tag" title="source">${c.source}</span></div></header>
+     ${Object.entries(c.fields).map(([k,v])=>{const id=`f-${ci}-${k}`,er=fieldErr[ci+":"+k];return `<div class="field"><label for="${id}" title="fields.${k}">${fieldLbl[k]||k}</label><div><input id="${id}" data-c="${ci}" data-k="${k}" value="${esc(v)}" class="${edited.has(ci+":"+k)?'edited':''}" ${er?'aria-invalid="true"':''}>${er?`<div class="err">${er}</div>`:''}</div></div>`}).join("")}
+     ${c.type==="Gap"?`<div class="field"><label for="node-${ci}" title="links.nodeId">Nó da rede *</label><div><select id="node-${ci}" data-node="${ci}" class="${edited.has(ci+":nodeId")?'edited':''}" ${bad?'aria-invalid="true"':''}><option value="">— escolha o nó current —</option>${NODES.map(n=>`<option ${n===c.links.nodeId?'selected':''}>${n}</option>`).join("")}${rb==="noncurrent"?`<option selected value="${esc(c.links.nodeId)}">${esc(c.links.nodeId)} (inválido)</option>`:""}</select>${bad?`<div class="err" id="refErr-${ci}">${rb==="null"?"Nó current obrigatório: Gap sem nó → a API responde 400 <code>invalid_reference</code>. Sem nó, o A4 não sabe onde aplicar a restrição.":`<code>invalid_reference</code>: “${esc(c.links.nodeId)}” é ${NONCURRENT[c.links.nodeId]||"ref não-current"}. Use o stable_id do nó current.`}</div>`:''}</div></div>`:''}
+     <footer>${c.id}${c.links.nodeId&&!bad?` · <button class="link" title="Abrir nó na rede (fora do wire)">nó ${c.links.nodeId}</button>`:(c.type==="Gap"?"":" · sem nó")}
+       ${c.type==="Gap"&&c.status==="gap"&&!bad?`<button class="btn" style="margin-left:auto" data-res="${ci}">Aceitar: CD3 640 ${tenantConfig.uom} + CD1 510 ${tenantConfig.uom}</button>`:`<span style="margin-left:auto"></span>`}
+       <button class="link" data-json="${ci}" aria-expanded="false" aria-controls="json${ci}">Ver JSON</button></footer>
+     <pre class="json" id="json${ci}"></pre>
+   </div>`}).join("");
+  $$("#cards input").forEach(inp=>inp.addEventListener("change",e=>{
+    const ci=e.target.dataset.c,k=e.target.dataset.k,c=cards[ci],v=e.target.value.trim();
+    if(k==="rampUpMeses"&&!(/^\d+$/.test(v)&&+v>=1&&+v<=24)){fieldErr[ci+":"+k]="Use um número de 1 a 24.";renderCards();$("#"+CSS.escape(`f-${ci}-${k}`)).focus();return;}
+    delete fieldErr[ci+":"+k];
+    if(v===c.fields[k]){renderCards();return;}
+    c.fields[k]=v;c.version++;c.source="edit";edited.add(ci+":"+k);
+    log("Usuário (Sales)",`Editou ${c.id}.${k} → "${v}" (v${c.version})`);premiseChanged(`${c.id}.${k} editado`);}));
+  $$("[data-node]").forEach(sel=>sel.onchange=()=>{const ci=sel.dataset.node,c=cards[ci];c.links.nodeId=sel.value||null;c.version++;c.source="edit";edited.add(ci+":nodeId");
+    log("Usuário (Sales)",`${c.id}.links.nodeId → ${c.links.nodeId??"null"} (v${c.version})`);premiseChanged(`${c.id} nó → ${c.links.nodeId??"vazio"}`);});
+  $$("[data-json]").forEach(l=>l.onclick=()=>{const i=l.dataset.json,p=$("#json"+i);p.textContent=JSON.stringify(cards[i],null,2);const on=p.classList.toggle("show");l.setAttribute("aria-expanded",on);l.textContent=on?"Ocultar JSON":"Ver JSON";});
+  $$("[data-res]").forEach(b=>b.onclick=()=>{const c=cards[b.dataset.res];c.status="ok";c.source="edit";c.version++;
+    c.fields.acaoSugerida=tk("Aceito: CD3 +640 {un}/mês; CD1 Jundiaí complementa 510 {un}/mês");edited.add(b.dataset.res+":acaoSugerida");
+    log("Usuário (Sales)",`Tratou gap ${c.id} (nó ${c.links.nodeId}) → status ok (v${c.version})`);premiseChanged("Gap CD3 tratado (CD1 complementa)");});
+  const blocked=inv.length>0;$("#toScn").disabled=blocked;
+  $("#toScnHint").textContent=blocked?"invalid_reference: vincule o Gap a um nó current para gerar o cenário.":"";
+  $("#toScn").textContent=S.scnGenerated?`Ver cenário v${S.scnVersion} →`:"Gerar cenário →";
+}
+const versions=[];
+function premiseChanged(chg){
+  if(S.scnGenerated){S.scnVersion++;versions.push({v:S.scnVersion,src:"edit",chg,t:now()});
+    if(S.lastRun&&S.lastRun.scnVersion===S.scnVersion-1)log("A4 Optimizer",`${S.lastRun.id} invalidado: premissa mudou (cenário v${S.scnVersion-1} → v${S.scnVersion})`);
+    if(S.running)log("A4 Optimizer",`Run em andamento será descartado (cenário → v${S.scnVersion})`);
+    S.unlocked=Math.min(S.unlocked,3);S.decided=null;$("#decMsg").innerHTML="";
+    const q=queueRead();let n=0;q.forEach(i=>{if(i.scenarioId==="SCN-0142"&&i.scenarioVersion<S.scnVersion&&i.status==="pending_finance"){i.status="stale";i.updatedAt=new Date().toISOString();n++;}});
+    if(n){queueWrite(q);log("Wire (alçada)",`${n} item(ns) da Fila de alçada → stale (cenário v${S.scnVersion-1} → v${S.scnVersion}); escale de novo a versão nova`);}}
+  renderCards();renderStepper();if(typeof renderAlcSim==="function")renderAlcSim();
+}
+$("#toScn").onclick=()=>{if(invalidCards().length)return;
+  if(!S.scnGenerated){S.scnGenerated=true;versions.push({v:1,src:"ditado",chg:`Criação a partir do ditado (${cards.length} premissas)`,t:now()});
+    $("#gen").disabled=true;$("#gen").textContent="Premissas geradas";$("#micHint").textContent="Cenário já criado — para mudar, edite as premissas na etapa 2.";$("#mic").disabled=true;
+    log("A1/A3","Cenário SCN-0142 v1 gerado");}
+  S.unlocked=Math.max(S.unlocked,3);go(3);};
+
+/* ---------- 3. cenário ---------- */
+const months=["mar/27","abr","mai","jun","jul","ago","set","out","nov","dez","jan/28","fev"];
+function renderScenario(){
+  const ramp=+(card("CurvaDemanda").fields.rampUpMeses)||9;
+  const inc=months.map((m,i)=>Math.round(1150*Math.min(1,1/(1+Math.exp(-(i-ramp/2)*0.9)))));
+  const base=months.map((m,i)=>4200+Math.round(Math.sin(i/2)*180));
+  const max=Math.max(...base.map((b,i)=>b+inc[i]));
+  $("#chart").innerHTML=months.map((m,i)=>`<div class="b" title="${m}: base ${base[i]} ${tenantConfig.uom} + FL-RIB ${inc[i]} ${tenantConfig.uom}"><i class="new" style="height:${inc[i]/max*110}px"></i><i style="height:${base[i]/max*110}px"></i></div>`).join("");
+  $("#chartX").innerHTML=months.map(m=>`<span>${m}</span>`).join("");
+  $("#scnVer").textContent="v"+S.scnVersion;$$(".vv").forEach(e=>e.textContent=S.scnVersion);
+  const gap=gapOpen();
+  $("#staleBanner").innerHTML=isStale()?`<div class="alert warn" role="alert" style="margin-bottom:14px">⟳ Premissa mudou depois do último run (${S.lastRun.id}, cenário v${S.lastRun.scnVersion}). Takeaways e cockpit estão travados até rodar o A4 em <b>v${S.scnVersion}</b>.</div>`:"";
+  $("#toOpt").textContent=isStale()?`Rodar A4 de novo em v${S.scnVersion} →`:(S.lastRun?"Ver resultado do A4 →":"Rodar otimizador (A4) →");
+  $("#scnKpis").innerHTML=[[tk("+11.840 {un}"),"demanda 12m FL-RIB"],[tk("{$} 5,55 mi"),"capex + estoque inicial"],[gap?"1 gap aberto":"0 gaps","premissas"]].map(([b,s])=>`<div class="kpi"><b>${b}</b><small>${s}</small></div>`).join("");
+  $("#scnTable").innerHTML=tk(`<tr><th>Série</th><th class="num">Mês 3</th><th class="num">Mês 12</th><th>Âncora</th></tr>
+   <tr><td>Demanda FL-RIB ({un})</td><td class="num">${inc[2]}</td><td class="num">${inc[11]}</td><td>FL-CPS 2022–23</td></tr>
+   <tr><td>Necessidade CD3 ({un})</td><td class="num">${Math.round(inc[2]*.9)}</td><td class="num">${Math.round(inc[11]*.9)}</td><td>${gap?'<span class="tag gap">gap CD3</span>':'CD3 + CD1'}</td></tr>
+   <tr><td>Estoque alvo FL-RIB (dias)</td><td class="num">22</td><td class="num">18</td><td>Política 18 d</td></tr>
+   <tr><td>Cash drivers ({$} mi)</td><td class="num">-2,9</td><td class="num">-0,4</td><td>A3 Finance</td></tr>`);
+  const R=readiness();
+  $("#toOptHint").innerHTML=R.state==="block"?`<span class="tag gap">Prontidão A4 ${R.met}/${R.need}</span> o run vai ficar bloqueado — veja na etapa 4`:"";
+  const planOk=S.lastRun&&!isStale();
+  $("#trace").innerHTML=`<span>ditado</span>→<span>${cards.length} premissas</span>→<span>séries v${S.scnVersion}</span>→<span style="${planOk?'':'opacity:.5'}">plano (A4)${planOk?' ✓':''}</span>`;
+  $("#verTable").innerHTML=`<tr><th>Versão</th><th>Origem</th><th>Mudança</th><th>Quando</th></tr>`+versions.slice().reverse().map(v=>`<tr><td><b>v${v.v}</b>${v.v===S.scnVersion?' <span class="tag agent">atual</span>':''}</td><td><span class="tag">${v.src}</span></td><td>${esc(v.chg)}</td><td>${v.t}</td></tr>`).join("");
+}
+$("#toOpt").onclick=()=>{S.unlocked=Math.max(S.unlocked,4);go(4);};
+
+/* ---------- 4. otimizador ---------- */
+/* ---------- v0.2.2: prontidão + simulação de estados A4 ---------- */
+const SIMS=["ready","blocked","infeasible","warn","clean","tech_error"];
+const SIM={state:"ready",ready:{policy:false,node_capacity:true,route:false,supplier_contract:false},supply:false};
+const RITEMS=[
+ {key:"policy",entity:"policies",tab:"politicas",label:"Política de {wc} (ou Estoque + Serviço) publicada"},
+ {key:"node_capacity",entity:"node_capacity",tab:"rede",label:"≥ 1 nó publicado com capacidade (node_capacity)"},
+ {key:"route",entity:"routes",tab:"logistica",label:"≥ 1 rota publicada"},
+ {key:"supplier_contract",entity:"supplier_contracts",tab:"contratos",label:"≥ 1 contrato de fornecedor publicado"}];
+const SHELL="2026-10-30-ibp-agentic-ux-wire-shell-v0.3.7.html";   /* v0.2.4 · pair: wizard 0.2.4 ↔ shell 0.3.7 (Pulse W3 + Visões W3; voltar) */
+/* ---------- v0.2.3: alçada Finance (B) — gate + handoff para a fila do shell (sem workspace Finance aqui) ----------
+   localStorage (mesma pasta/origem file:// do shell v0.3.6) — v0.2.4: item = AlcadaQueueItem do schema (name/impactMi):
+   · "ibp.alcada.mi"    → string número ("2", "5") ou "none" (sem política). Escrito SÓ pelo shell (espelho da POL-04 publicada).
+   · "ibp.alcada.polref" → JSON {id, version} da POL-04 (espelho do shell 0.3.6; ausente = {POL-04, 1}).
+   · "ibp.alcada.queue" → JSON AlcadaQueueItem[] (contracts/alcada-queue-item.schema.json): {id, scenarioId, scenarioVersion, name,
+                           runId, impactMi, alcadaMi, policyRef{id,version}, status, escalateTo, events: DecisionEvent v0.2[], createdAt, updatedAt}. */
+const LS_ALC="ibp.alcada.mi",LS_Q="ibp.alcada.queue",LS_PR="ibp.alcada.polref",ALC_DEFAULT=2;
+const ALC={role:"sales",override:null};
+const lsGet=k=>{try{return localStorage.getItem(k);}catch(e){return null;}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,v);return true;}catch(e){return false;}};
+function alcadaRead(){
+  if(ALC.override==="outofpack")return {mi:null,oop:true,src:"override do painel (wire) · POL-04 fora do pack"};
+  if(ALC.override!=null)return {mi:ALC.override==="none"?null:+ALC.override,src:"override do painel (wire)"};
+  const v=lsGet(LS_ALC);
+  if(v==null)return {mi:ALC_DEFAULT,src:"default POL-04 (shell ainda não aberto)"};
+  if(v==="outofpack")return {mi:null,oop:true,src:"shell · POL-04 fora do pack do tenant"};
+  if(v==="none"||v==="")return {mi:null,src:"shell · nenhuma alçada publicada"};
+  const n=parseFloat(String(v).replace(",","."));return isNaN(n)?{mi:ALC_DEFAULT,src:"default POL-04"}:{mi:n,src:"shell · POL-04 publicada"};
+}
+function investMi(){const c=card("Investimento"),d=String(c&&c.fields.capex||"").replace(/[^\d]/g,"");return d?+d/1e6:0;}
+const fmtMi=v=>tk("{$}")+" "+(Number.isInteger(v)?String(v):num1(v))+" mi";
+/* PO 2026-10-30 fail-closed: sem alçada publicada (none / sem limiar) ≡ alçada 0 → qualquer investimento > 0 é "over". */
+function gate(){const a=alcadaRead(),inv=investMi();
+  if(a.oop)return {alc:null,src:a.src,inv,none:false,oop:true,over:false,role:ALC.role,salesBlocked:false};   /* único fail-open */
+  const none=a.mi==null,alc=none?0:a.mi,over=inv>alc;
+  return {alc,src:a.src,inv,none,oop:false,over,role:ALC.role,salesBlocked:over&&ALC.role==="sales"};}
+const alcLbl=G=>G.none?fmtMi(0)+" (sem alçada publicada)":fmtMi(G.alc);
+function queueRead(){try{const q=JSON.parse(lsGet(LS_Q)||"[]");return Array.isArray(q)?q:[];}catch(e){return [];}}
+function queueWrite(q){lsSet(LS_Q,JSON.stringify(q));}
+/* v0.2.4 · policyRef {id,version} do espelho do shell 0.3.6; alias legado nome/invMi só na LEITURA */
+function polRefRead(){try{const p=JSON.parse(lsGet(LS_PR)||"null");if(p&&typeof p.id==="string"&&p.id&&Number.isInteger(p.version)&&p.version>=1)return {id:p.id,version:p.version};}catch(e){}return {id:"POL-04",version:1};}
+const qImp=i=>i.impactMi!==undefined?i.impactMi:i.invMi;
+const myQ=()=>queueRead().filter(i=>i.scenarioId==="SCN-0142"&&i.scenarioVersion===S.scnVersion&&i.status!=="stale").pop()||null;
+const QST={pending_finance:["pendente Finance","warn"],approved_finance:["aprovado Finance","ok"],escalated_owner:["escalado domain owner","gap"],stale:["stale","" ]};
+let evSeq=0;const decisionEvents=[];
+function decisionEvent(action,why,role,scnId,ver,runId,x){
+  /* DecisionEvent v0.2 do schema (additionalProperties:false). x = {impactMi?, alcadaMi?, escalateTo?} — só chaves presentes entram. */
+  const e={id:`DEC-${scnId.slice(4)}-v${ver}-${Date.now().toString(36)}${++evSeq}`,scenarioId:scnId,scenarioVersion:ver,runId:runId||null,action,why,
+    actor:{role,userId:null},at:new Date().toISOString(),exportRef:action==="approve"?`export/plano_${scnId}_v${ver}.xlsx`:null};
+  x=x||{};
+  if(typeof x.impactMi==="number")e.impactMi=x.impactMi;
+  if(x.alcadaMi===null||typeof x.alcadaMi==="number")e.alcadaMi=x.alcadaMi;
+  if(action==="escalate"&&(x.escalateTo==="finance"||x.escalateTo==="domain_owner"))e.escalateTo=x.escalateTo;
+  return e;
+}
+function renderAlcSim(){const g=gate();
+  $("#alcTag").textContent=g.oop?"fora do pack · fail-open":g.none?"sem alçada ≡ 0":`alçada ${num1(g.alc).replace(/[,.]0$/,"")} · ${g.role}`;$("#alcTag").className="tag "+(g.oop?"warn":g.over?"gap":"ok");
+  $("#simAlcInfo").innerHTML=`Lido: <b>${g.oop?"POL-04 fora do pack (fail-open)":g.none?"sem política ≡ "+fmtMi(0)+" (fail-closed)":fmtMi(g.alc)}</b> (${esc(g.src)}) · investimento ${fmtMi(g.inv)} → ${g.oop?"sem gate":g.over?"<b>acima</b>":"dentro"} · fila: ${queueRead().length} item(ns)`;
+  $$('[name="simRole"]').forEach(r=>r.checked=r.value===ALC.role);$$('[name="simAlcV"]').forEach(r=>r.checked=r.value===(ALC.override==null?"shell":String(ALC.override)));}
+function alcadaChanged(){renderAlcSim();if(S.cur===5)renderCockpit();}
+window.simAlcada=(v,role)=>{if(v!==undefined)ALC.override=v==null||v==="shell"?null:v==="over"?2:v==="under"?5:v;if(role)ALC.role=role;alcadaChanged();return gate();};
+
+/* espelho de computeReadiness (src/domain/a4Readiness.ts). Fora de "blocked" o mock é tudo ok. */
+function readiness(){
+  const sim=SIM.state==="blocked";
+  const items=RITEMS.map(it=>{const required=it.key!=="supplier_contract"||(sim&&SIM.supply);
+    const ok=!sim||SIM.ready[it.key];return {...it,label:tk(it.label),required,status:!required?"n/a":ok?"ok":"falta"};});
+  const need=items.filter(i=>i.required).length,met=items.filter(i=>i.required&&i.status==="ok").length;
+  return {state:met===need?"ok":"block",met,need,pct:need?Math.round(100*met/need):0,items,scope:{supply_external_in_scope:sim&&SIM.supply}};
+}
+function readinessList(R){return `<ul class="rlist">${R.items.map(i=>`<li><span class="tag ${i.status==="ok"?"ok":i.status==="falta"?"gap":""}">${i.status}</span><span class="sp">${esc(i.label)} <code class="hint">${i.entity}</code></span>${i.status==="falta"?`<a class="btn" href="${SHELL}#cadastro/${i.tab}" target="_blank" rel="noopener" data-cad="${i.key}">Resolver no Cadastro ↗</a>`:""}</li>`).join("")}</ul>`;}
+function setA4State(html){$("#a4State").innerHTML=html?`<div style="margin-bottom:14px">${html}</div>`:"";}
+function setRunUi(status,cls){$("#runStatus").textContent=status;$("#runStatus").className="tag "+(cls||"");}
+function resetRunArea(){$("#reasonsCard").hidden=true;$("#drill").hidden=true;$("#toCk").disabled=true;$("#optKpis").innerHTML="";$("#prog").style.width="0%";$("#progBar").setAttribute("aria-valuenow",0);}
+function setSim(st,opts={}){
+  if(!SIMS.includes(st))st="ready";
+  SIM.state=st;$$('[name="sim"]').forEach(r=>r.checked=r.value===st);$("#simTag").textContent=st;$("#simTag").className="tag "+(st==="ready"||st==="clean"?"ok":st==="warn"?"warn":"gap");
+  $("#simReady").style.opacity=st==="blocked"?1:.5;
+  if(opts.silent)return;
+  log("Wire (sim)",`Estado A4 simulado → ${st}`);
+  S.runToken=(S.runToken||0)+1; /* run em voo é descartado */
+  if(S.running){S.running=false;clearInterval(S.timer);$("#rerun").disabled=false;$("#rerun").removeAttribute("aria-busy");}
+  if(S.lastRun){S.lastRun=null;S.decided=null;$("#decMsg").innerHTML="";}
+  S.unlocked=Math.min(S.unlocked,S.scnGenerated?4:S.unlocked);
+  if(S.cur>=4&&S.scnGenerated)go(4);else{renderStepper();if(S.cur===3)renderScenario();}
+}
+window.simA4=setSim;
+function reasonsByOutcome(outcome,gap){
+  if(outcome==="infeasible")return {reasons:[
+   {rank:1,kind:"capacidade",summary:tk("Capacidade de {cap} do CD3 + CD1 insuficiente: faltam 1.150 {un}/mês no pico mesmo usando todas as rotas."),refs:{nodeId:"CD3",skuId:null,routeId:null,period:"2027-06..2027-09"},severity:"block"},
+   {rank:2,kind:"janela",summary:"Rota R-02 (CD1→FL-RIB) sem janela livre em jun–ago: não há caminho alternativo para FL-RIB.",refs:{nodeId:"FL-RIB",skuId:null,routeId:"R-02",period:"2027-06..2027-08"},severity:"block"},
+   {rank:3,kind:"contrato",summary:tk("Take-or-pay do Grupo A ocupa 300 {un}/mês de capacidade do CD2 que o plano precisaria liberar."),refs:{nodeId:"CD2",skuId:"SKU-4471",routeId:null,period:"2027-Q2"},severity:"block"}],
+   countsByKind:normCounts({janela:11,capacidade:19,contrato:4,custo:5,outro:2})};
+  if(outcome==="warn"){const d=reasonsData(false);d.reasons=d.reasons.map(r=>({...r,severity:"warn"}));return d;}
+  return reasonsData(gap);
+}
+const maxSev=rs=>rs.some(r=>r.severity==="block")?"block":rs.some(r=>r.severity==="warn")?"warn":"info";
+function reasonsData(gap){
+  const r=[
+   {rank:1,kind:"capacidade",summary:tk(gap?"CD3 Uberlândia excede a capacidade de {cap} em 18% nos meses 4–7: 510 {un}/mês de FL-RIB sem cobertura.":"CD3 no limite de capacidade de {cap} (97%) em jun–jul; CD1 absorve 510 {un}/mês com +1 dia de lead time."),refs:{nodeId:"CD3",skuId:null,routeId:null,period:"2027-06..2027-09"},severity:gap?"block":"warn"},
+   {rank:2,kind:"janela",summary:"Rota R-14 (CD3→FL-RIB) só tem janela ter/qui; picos de sexta passam para a semana seguinte (serviço −2,1 p.p.).",refs:{nodeId:"FL-RIB",skuId:null,routeId:"R-14",period:"2027-05"},severity:"warn"},
+   {rank:3,kind:"contrato",summary:tk("Take-or-pay do Grupo A obriga compra de 300 {un}/mês do SKU-4471 mesmo com estoque acima da política no CD2."),refs:{nodeId:"CD2",skuId:"SKU-4471",routeId:null,period:"2027-Q2"},severity:"warn"}
+  ];
+  const counts=gap?{janela:7,capacidade:12,contrato:3,custo:5,outro:1}:{janela:7,capacidade:4,contrato:3,custo:5,outro:1};
+  /* normaliza payload legado (kind antigo) antes de renderizar — igual ao shell 0.3.1 */
+  return {reasons:r.map(x=>({...x,kind:normKind(x.kind)})),countsByKind:normCounts(counts)};
+}
+const drillRows=[
+ ["SKU-4471","Item A1 · Família A","R-14 CD3→FL-RIB","2027-06","capacidade",420,310,"−110"],
+ ["SKU-4471","Item A1 · Família A","R-02 CD1→FL-RIB","2027-06","janela",150,150,"0"],
+ ["SKU-1180","Item B1 · Família B","R-14 CD3→FL-RIB","2027-07","capacidade",260,180,"−80"],
+ ["SKU-2093","Item C1 · Família C","R-14 CD3→FL-RIB","2027-05","janela",310,265,"−45"],
+ ["SKU-4471","Item A1 · Família A","FORN-A→CD2","2027-Q2","contrato",600,900,"+300"],
+ ["SKU-3302","Item B2 · Família B","R-09 CD2→FL-SJRP","2027-08","custo",140,120,"−20"],
+ ["SKU-1180","Item B1 · Família B","R-02 CD1→FL-RIB","2027-08","custo",90,90,"0"],
+ ["SKU-5520","Item C2 · Família C","R-14 CD3→FL-RIB","2027-09","capacidade",180,140,"−40"],
+ ["SKU-2093","Item C1 · Família C","R-21 CD1→FL-CPS","2027-07","outro",75,70,"−5"]
+].map(r=>(r[4]=normKind(r[4]),r));
+const phases=[[0,"Carregando rede e políticas…"],[30,"Montando o modelo (3 CDs, 15 filiais, 120 SKUs)…"],[60,"Resolvendo com OR-Tools…"],[88,"Gerando razões e contagens…"]];
+function runOpt(){
+  if(S.running)return;
+  const R=readiness();
+  if(R.state==="block"){
+    resetRunArea();$("#runId").textContent="RUN-A4-—";setRunUi("bloqueado · prontidão","gap");
+    $("#runMeta").textContent=`SCN-0142 v${S.scnVersion} · nenhum run criado`;$("#runPhase").textContent="";
+    setA4State(`<div class="alert gap" role="alert" id="a4Blocked"><h3>✕ O A4 não pode rodar: cadastro mínimo incompleto (${R.met}/${R.need} · ${R.pct}%)</h3>
+      O otimizador precisa do cadastro publicado de {tenant} para montar o modelo. Nenhum plano foi gerado e suas premissas continuam salvas no cenário v${S.scnVersion}.
+      ${readinessList(R)}<div class="row"><a class="btn primary" href="${SHELL}#cadastro/${(R.items.find(i=>i.status==="falta")||RITEMS[0]).tab}" target="_blank" rel="noopener">Abrir Cadastro · Prontidão ↗</a><button class="btn" id="recheck">Checar prontidão de novo</button><button class="btn ghost" data-go="3">← Voltar ao cenário</button></div></div>`);
+    applyTk($("#a4State"));$("#recheck").onclick=()=>{log("Usuário (Sales)","Re-checou prontidão A4");runOpt();};
+    S.unlocked=Math.min(S.unlocked,4);renderStepper();
+    log("A4 Optimizer",`Run não criado: prontidão A4 = block (${R.met}/${R.need}; falta ${R.items.filter(i=>i.status==="falta").map(i=>i.key).join(", ")})`);return;}
+  setA4State(isStale()?"":"");
+  S.running=true;S.runSeq++;const id="RUN-A4-"+String(3180+S.runSeq),v=S.scnVersion,tok=S.runToken=(S.runToken||0)+1,sim=SIM.state;
+  $("#runId").textContent=id;$("#runStatus").textContent="rodando…";$("#runStatus").className="tag warn";
+  $("#runMeta").textContent=`SCN-0142 v${v} · OR-Tools · 3 CDs, 15 filiais, 120 SKUs (escopo piloto)`;
+  $("#reasonsCard").hidden=true;$("#drill").hidden=true;$("#toCk").disabled=true;$("#rerun").disabled=true;$("#rerun").setAttribute("aria-busy","true");
+  $("#optKpis").innerHTML=["{svc}","{cost} 12m","Cash/{wc} (pico)","{viol}"].map(tk).map(s=>`<div class="kpi"><div class="skel" style="width:60%;height:18px"></div><small>${s}</small></div>`).join("");
+  S.unlocked=Math.min(S.unlocked,4);renderStepper();
+  let p=0;const t=S.timer=setInterval(()=>{if(tok!==S.runToken){clearInterval(t);return;}
+    p+=12;const w=Math.min(p,100);$("#prog").style.width=w+"%";$("#progBar").setAttribute("aria-valuenow",w);
+    $("#runPhase").textContent=phases.filter(x=>w>=x[0]).pop()[1]+" Pode voltar às etapas anteriores; o resultado aparece aqui.";
+    if(sim==="tech_error"&&p>=72){clearInterval(t);failRun(id,v);return;}
+    if(p>=100){clearInterval(t);finishRun(id,v,sim);}},110);
+}
+function failRun(id,v){
+  S.running=false;$("#rerun").disabled=false;$("#rerun").removeAttribute("aria-busy");
+  setRunUi("erro técnico","gap");$("#optKpis").innerHTML="";$("#runPhase").textContent="";
+  setA4State(`<div class="alert gap" role="alert" id="a4TechErr"><h3>✕ O otimizador falhou antes de terminar (${id})</h3>
+    O solver não respondeu em 120 s (<code>a4_solver_timeout</code>). Não é problema das suas premissas nem do cadastro: nada foi salvo e o cenário v${v} está intacto.
+    <div class="row" style="margin-top:8px"><button class="btn primary" id="retry">Tentar de novo</button><button class="btn ghost" data-go="3">← Voltar ao cenário</button><span class="hint">Se repetir, o run vai para a fila do suporte com o ${id}.</span></div></div>`);
+  $("#retry").onclick=()=>{log("Usuário (Sales)",`Tentou de novo após erro técnico (${id})`);runOpt();};
+  log("A4 Optimizer",`${id} falhou: a4_solver_timeout (retryable) sobre SCN-0142 v${v}`);renderStepper();
+}
+function finishRun(id,v,sim){
+  S.running=false;$("#rerun").disabled=false;$("#rerun").removeAttribute("aria-busy");
+  if(v!==S.scnVersion){setA4State("");$("#runStatus").textContent="descartado";$("#runStatus").className="tag";
+    $("#runPhase").textContent=`Resultado descartado: o cenário mudou para v${S.scnVersion} durante o run. Rode de novo.`;$("#optKpis").innerHTML="";
+    log("A4 Optimizer",`${id} descartado (cenário mudou de v${v} para v${S.scnVersion})`);renderStepper();return;}
+  const outcome=sim==="infeasible"?"infeasible":sim==="warn"?"warn":(gapOpen()?"partial":"feasible");
+  const gap=outcome==="partial"||outcome==="infeasible",d=sim==="clean"&&outcome==="feasible"?{reasons:[],countsByKind:{}}:reasonsByOutcome(outcome,gapOpen());
+  const status=outcome==="infeasible"?"infeasible":maxSev(d.reasons)==="block"?"partial":"feasible";
+  S.lastRun={id,scnVersion:v,gap,outcome,status,sev:maxSev(d.reasons),...d};
+  $("#runPhase").textContent=`Concluído às ${now()}.`;
+  const ST={infeasible:["infactível","gap"],partial:["factível parcial","gap"],warn:["factível c/ restrições","warn"],feasible:["factível","ok"]};
+  setRunUi(...ST[outcome]);
+  const kp=outcome==="infeasible"?[["{svc}","—"],["{cost} 12m","—"],["Cash/{wc} (pico)","—"],["{viol}","sem plano"]]:
+    [["{svc}",gap?"93,4%":"95,8%"],["{cost} 12m",money(gap?18.9:19.3)],["Cash/{wc} (pico)",money(gap?-6.1:-5.8)],["{viol}",gap?"4":"2"]];
+  $("#optKpis").innerHTML=kp.map(([s,b])=>`<div class="kpi"><b>${b}</b><small>${tk(s)}</small></div>`).join("");
+  const gc=cards.find(c=>c.type==="Gap"&&c.status==="gap");
+  setA4State(outcome==="infeasible"?`<div class="alert gap" role="alert" id="a4Infeasible"><h3>✕ Plano infactível — não aprovável</h3>Nenhum plano atende às restrições duras (3 razões <span class="sev block">block</span>). O A7 vai pedir escalonamento ao domain owner; dá para rever premissas ou cadastro e rodar de novo.<div class="row" style="margin-top:8px"><button class="btn" data-go="2">← Rever premissas</button><button class="btn primary" data-go="5">Ver takeaways e escalar →</button></div></div>`
+   :outcome==="partial"?`<div class="alert gap" role="alert" id="a4CapGap"><h3>⚠ Capacity gap aberto — plano factível parcial</h3>${gc?`O gap <b>${gc.id}</b> (nó <code>${esc(gc.links.nodeId)}</code>) virou restrição dura: razão <b>capacidade</b> <span class="sev block">block</span>. `:""}Aprovar assim exige justificativa explícita; o A7 recomenda escalar. Tratar o gap na etapa 2 cria nova versão do cenário.<div class="row" style="margin-top:8px"><button class="btn" data-go="2">Tratar o gap na etapa 2</button></div></div>`
+   :outcome==="warn"?`<div class="alert warn" id="a4Warn"><h3>⚠ Factível com restrições</h3>Só razões <span class="sev warn">warn</span>: o plano pode ser aprovado, mas o porquê precisa citar a restrição aceita.</div>`:"");
+  S.filter=null;
+  $("#chips").innerHTML=Object.entries(d.countsByKind).map(([k,n])=>`<button class="chip" data-k="${k}" aria-pressed="false" aria-label="Filtrar ${kLbl(k)}: ${n} ocorrências">${kLbl(k)}<b>${n}</b></button>`).join("");
+  $$(".chip").forEach(c=>c.onclick=()=>{setFilter(S.filter===c.dataset.k?null:c.dataset.k);if(S.filter)$("#drill").open=true;});
+  $("#reasons").innerHTML=d.reasons.map(r=>`<div class="reason"><div class="rk" aria-label="rank ${r.rank}">${r.rank}</div>
+    <div><div class="row"><span class="tag">${kLbl(r.kind)}</span><span class="sev ${r.severity}" title="severity">${r.severity}</span></div>
+      <div style="margin-top:4px">${esc(r.summary)}</div>
+      <div class="refs">${Object.entries(r.refs).filter(([k,v])=>v!==null).map(([k,v])=>`<code>${k}: ${esc(v)}</code>`).join("")}</div></div>
+    <button class="btn ghost" data-dk="${r.kind}" aria-label="Ver ${kLbl(r.kind)} no drill-down">Ver no drill-down ↓</button></div>`).join("");
+  $$("[data-dk]").forEach(b=>b.onclick=()=>{setFilter(b.dataset.dk);$("#drill").open=true;$("#drill").scrollIntoView({behavior:"smooth"});});
+  if(!d.reasons.length)$("#reasons").innerHTML=`<div class="alert ok" id="noReasons">✓ Factível sem razões (<code>status=feasible</code>, <code>reasons: []</code>). Porquê ao aprovar pode ser curto, mas não vazio (regra PO).</div>`;
+  $("#reasonsCard").hidden=false;$("#drill").hidden=!d.reasons.length;if(d.reasons.length)renderDrill();
+  S.unlocked=Math.max(S.unlocked,5);$("#toCk").disabled=false;renderStepper();
+  log("A4 Optimizer",`${id} concluído (${ST[outcome][0]}${outcome==="infeasible"?", sem plano":gap?", 4 violações":", 2 violações"}) sobre SCN-0142 v${v}`);
+  log("A5 Policy",tk(outcome==="infeasible"?"Plano infactível: escalar obrigatório (capacidade, janela, contrato)":gap?"2 violações para escalar (capacidade CD3, {svc} < 95%)":"Violações resolvíveis dentro da política"));
+}
+function setFilter(k){S.filter=k;$$(".chip").forEach(x=>{const on=x.dataset.k===k;x.classList.toggle("on",on);x.setAttribute("aria-pressed",on);});renderDrill();}
+function renderDrill(){
+  const rows=drillRows.filter(r=>!S.filter||r[4]===S.filter);
+  $("#drillCount").textContent=`· ${rows.length} linhas${S.filter?` · filtro: ${kLbl(S.filter)}`:""}`;
+  $("#drillTable").innerHTML=`<tr><th>SKU</th><th>Descrição</th><th>Rota</th><th>Período</th><th>Tipo</th><th class="num">Necessidade (${tenantConfig.uom})</th><th class="num">Planejado (${tenantConfig.uom})</th><th class="num">Δ</th></tr>`+
+   (rows.length?rows.map(r=>`<tr><td><code>${r[0]}</code></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td><span class="tag">${kLbl(r[4])}</span></td><td class="num">${r[5]}</td><td class="num">${r[6]}</td><td class="num" style="color:${r[7].startsWith('−')?'var(--gap)':'inherit'}">${r[7]}</td></tr>`).join("")
+   :`<tr><td colspan="8" class="hint">Nenhuma linha de amostra para “${kLbl(S.filter)}” neste wire (contagem vem do run completo).</td></tr>`);
+}
+$("#rerun").onclick=runOpt;
+$("#toCk").onclick=()=>go(5);
+
+/* ---------- 5. takeaways + cockpit ---------- */
+let scenarios=[
+ {id:"SCN-0101",name:"Baseline",v:"v7",cash:-3.2,serv:96.1,cost:17.6,viol:1,note:"Rede atual, sem nova filial"},
+ {id:"SCN-0142",name:"Abrir filial Y",v:"v1",cash:-6.1,serv:93.4,cost:18.9,viol:4,note:"FL-RIB semelhante a FL-CPS · {$} 4,2 mi"},
+ {id:"SCN-0139",name:"Stress supply",v:"v2",cash:-7.4,serv:89.7,cost:20.2,viol:6,note:"Lead time Grupo A +15 dias"}
+];
+const CANDIDATE={id:"SCN-0145",name:"Fornecedor B +2 dias",v:"v1",cash:-2.7,serv:95.2,cost:17.9,viol:1,note:"Prazo Grupo B estendido em 2 dias"};
+const archived=[];
+let selected="SCN-0142";
+/* Regra PO Task 7 (2026-10-30): porquê SEMPRE não-vazio (≥ 1). ≥ 20 só se houver reason warn/block ou run factível parcial. */
+const runHasWarn=run=>!!(run&&(run.reasons||[]).some(r=>r.severity==="warn"));
+const runNeeds20=run=>!!(run&&(run.outcome==="partial"||run.status==="partial"||(run.reasons||[]).some(r=>r.severity==="warn"||r.severity==="block")));
+function whyRule(run){return {required:true,min:runNeeds20(run)?20:1};}
+const LBL={escalar:"gap",["na política"]:"ok",contexto:""};
+function renderCockpit(){
+  const run=S.lastRun,gap=run?run.gap:gapOpen();const y=scenarios.find(s=>s.id==="SCN-0142");const G=gate();renderAlcSim();
+  const oc=run?run.outcome:(gap?"partial":"feasible");
+  if(y){y.v="v"+S.scnVersion;Object.assign(y,oc==="infeasible"?{cash:-6.1,serv:88.2,cost:18.9,viol:11}:gap?{cash:-6.1,serv:93.4,cost:18.9,viol:4}:{cash:-5.8,serv:95.8,cost:19.3,viol:2});}
+  $$(".vv").forEach(e=>e.textContent=S.scnVersion);$("#recoRun").textContent=run?run.id:"RUN-A4";
+  const head=tk(oc==="infeasible"?"Recomendação: escalar. Não existe plano viável para a filial Y com o cadastro atual: capacidade, janela e contrato bloqueiam (3 razões block). O plano não pode ser aprovado.":oc==="warn"?"Recomendação: aprovar com ressalvas. O plano fecha sem bloqueios, mas há 3 restrições warn (capacidade CD3 no limite, janela R-14, take-or-pay) — registre o porquê ao aprovar.":gap?"Recomendação: escalar. A filial Y vende, mas o plano fica abaixo da política de {svc} (93,4% vs. 95%) por falta de capacidade de {cap} no CD3."
+                :G.oop?`Recomendação: aprovar. A filial Y fecha na política ({svc} 95,8%). POL-04 está fora do pack do tenant: não há gate de alçada Finance para o investimento de ${fmtMi(G.inv)}.`
+                :G.none&&G.over?`Recomendação: escalar para Finance. A filial Y fecha na política ({svc} 95,8%), mas não há alçada publicada (≡ alçada ${fmtMi(0)}, fail-closed): o investimento de ${fmtMi(G.inv)} não pode ser aprovado por Sales — escale para Finance ou configure a alçada no Cadastro.`
+                :G.over?`Recomendação: escalar para Finance. A filial Y fecha na política ({svc} 95,8%), mas o investimento de ${fmtMi(G.inv)} passa da alçada de Finance (> ${fmtMi(G.alc)}).`
+                :`Recomendação: aprovar. A filial Y fecha na política ({svc} 95,8%) e o investimento de ${fmtMi(G.inv)} está dentro da alçada (≤ ${fmtMi(G.alc)}).`);
+  const headX=(oc!=="feasible"||gap)&&G.over?` Investimento ${fmtMi(G.inv)} > alçada ${alcLbl(G)}: a decisão também passa por Finance.`:"";
+  $("#recoCard").className="card reco "+(gap||oc==="infeasible"?"esc":oc==="warn"?"":"ok");$("#recoHeadline").textContent=head+headX;
+  const T=oc==="infeasible"?[
+   ["⚠","Plano infactível: faltam 1.150 {un}/mês de capacidade de {cap} no pico mesmo com CD1 + CD3 (kind capacidade, block).","escalar"],
+   ["⚠","Sem janela alternativa na rota R-02 em jun–ago — não há caminho para FL-RIB nesse período (kind janela, block).","escalar"],
+   ["⚠","Take-or-pay do Grupo A trava capacidade do CD2; renegociar ou ampliar capacidade são decisões do domain owner.","escalar"],
+   ["→","Opções para o escalonamento: adiar abertura, ampliar capacidade do CD3, ou revisar contrato Grupo A — rode de novo após decidir.","contexto"]
+  ]:oc==="warn"?[
+   ["✓","Plano factível: {svc} 95,8% e nenhuma razão block.","na política"],
+   ["⚠","CD3 no limite de capacidade de {cap} (97%) em jun–jul — restrição warn aceita ao aprovar.","contexto"],
+   ["⚠","Janela ter/qui da R-14 tira 2,1 p.p. de serviço nas sextas — restrição warn.","contexto"],
+   ["→","Aprovar exige porquê citando a restrição aceita (fica no DecisionEvent).","na política"]
+  ]:gap?[
+   ["⚠","Filial Y é viável comercialmente (+11,8 mil {un} em 12 meses, payback 26 meses), mas {svc} cai para 93,4% — abaixo dos 95% da política.","escalar"],
+   ["⚠","Causa principal: capacidade de {cap} do CD3 (12 ocorrências, kind capacidade). O gap PC-0142-04 segue aberto: sem decidir entre CD1 complementar ou ampliar o CD3, o cenário não fecha.","escalar"],
+   ["→","Take-or-pay do Grupo A gera +300 {un}/mês de excesso no CD2 no Q2/27: realocar para FL-RIB reduz o cash de pico em ~{$} 0,4 mi.","na política"],
+   ["✓","Vs. Baseline: −{$} 2,9 mi de cash no pico e +{$} 1,3 mi/ano de {cost}. Stress supply mostra que o risco do Grupo A é maior que o da filial.","contexto"]
+  ]:[
+   ["✓","Com o CD1 complementando 510 {un}/mês, a filial Y fecha na política: {svc} 95,8% e 2 violações resolvíveis.","na política"],
+   ["→","{cost} sobe {$} 0,4 mi vs. a versão com gap (rota R-02 é mais longa) — dentro da alçada de Sales/Supply.","na política"],
+   ["→","Take-or-pay do Grupo A: realocar o excesso do CD2 para FL-RIB reduz o cash de pico em ~{$} 0,4 mi.","na política"],
+   G.oop?["⚠",`Vs. Baseline: −{$} 2,6 mi de cash no pico; investimento de ${fmtMi(G.inv)} sem gate de alçada (POL-04 fora do pack do tenant).`,"contexto"]
+   :G.none&&G.over?["⚠",`Vs. Baseline: −{$} 2,6 mi de cash no pico; investimento de ${fmtMi(G.inv)} sem alçada publicada (≡ alçada ${fmtMi(0)}, fail-closed) — Sales não aprova; escale para Finance ou configure em Cadastro · Políticas · Alçadas.`,"escalar"]
+   :G.over?["⚠",`Vs. Baseline: −{$} 2,6 mi de cash no pico; investimento de ${fmtMi(G.inv)} precisa de aprovação de Finance (alçada > ${fmtMi(G.alc)}).`,"escalar"]
+   :["✓",`Vs. Baseline: −{$} 2,6 mi de cash no pico; investimento de ${fmtMi(G.inv)} dentro da alçada (≤ ${fmtMi(G.alc)}) — Sales aprova.`,"na política"]
+  ];
+  $("#takeaways").innerHTML=T.map(([i,t,c])=>`<div class="take"><span class="ic" aria-hidden="true" style="color:${i==='⚠'?'var(--gap)':i==='✓'?'var(--ok)':'var(--acc)'}">${i}</span><div>${tk(t)}</div><span class="tag ${LBL[c]}">${c}</span></div>`).join("");
+  const K=[["cash",tk("Cash / {wc} (pico)"),v=>money(v),"max"],["serv",tk("Serviço ({svc})"),v=>`${num1(v)}%`,"max"],["cost",tk("{cost} 12m"),v=>money(v),"min"],["viol",tk("# {viol}"),v=>v,"min"]];
+  $("#scns").innerHTML=scenarios.map(s=>`<div class="scn ${s.id===selected?'sel':''}" data-sel="${s.id}" role="radio" tabindex="${s.id===selected?0:-1}" aria-checked="${s.id===selected}" aria-label="${esc(s.name)} ${s.id} ${s.v}">
+     <div class="row"><input type="radio" name="sel" tabindex="-1" aria-hidden="true" ${s.id===selected?'checked':''}><h3>${esc(s.name)}</h3><span class="v">${s.id} · ${s.v}</span></div>
+     <div class="hint" style="margin:4px 0 8px">${esc(tk(s.note))}</div>
+     ${K.map(([k,l,f,dir])=>{const vals=scenarios.map(x=>x[k]);const b=dir==="max"?Math.max(...vals):Math.min(...vals),w=dir==="max"?Math.min(...vals):Math.max(...vals);
+       return `<div class="kv"><span>${l}</span><b class="${s[k]===b?'best':s[k]===w?'worst':''}">${f(s[k])}</b></div>`}).join("")}
+   </div>`).join("");
+  const pick=id=>{if(selected!==id){selected=id;$("#whyErr").innerHTML="";$("#why").removeAttribute("aria-invalid");}renderCockpit();const el=$(`[data-sel="${id}"]`);el&&el.focus();};
+  $$("[data-sel]").forEach(c=>{c.onclick=()=>pick(c.dataset.sel);
+    c.onkeydown=e=>{const i=scenarios.findIndex(s=>s.id===c.dataset.sel);
+      if(e.key===" "||e.key==="Enter"){e.preventDefault();pick(c.dataset.sel);}
+      if(e.key==="ArrowRight"||e.key==="ArrowDown"){e.preventDefault();pick(scenarios[(i+1)%scenarios.length].id);}
+      if(e.key==="ArrowLeft"||e.key==="ArrowUp"){e.preventDefault();pick(scenarios[(i+scenarios.length-1)%scenarios.length].id);}};});
+  const s=scenarios.find(x=>x.id===selected)||scenarios[0];selected=s.id;
+  $("#selName").textContent=s.name;$("#selVer").textContent=`(${s.id} · ${s.v})`;
+  const mine=s.id==="SCN-0142";
+  $("#decWarn").innerHTML=mine&&oc==="infeasible"?`<div class="alert gap" id="decInfeasible">✕ Plano <b>infactível</b> (razões <span class="sev block">block</span>) — não pode ser aprovado. Escale para o domain owner com o porquê.</div>`
+    :mine&&oc==="warn"||mine&&runHasWarn(run)&&!gap?`<div class="alert warn" id="decWarnSev">⚠ Plano com restrições <span class="sev warn">warn</span>. Aprovar exige porquê citando a restrição aceita (mín. 20 caracteres).</div>`
+    :mine&&gap?`<div class="alert warn">⚠ Este cenário tem razão <span class="sev block">block</span> (capacidade CD3). O A7 recomenda escalar; aprovar assim exige justificativa explícita.</div>`
+    :s.viol>3?`<div class="alert warn">⚠ ${s.viol} violações de política neste cenário.</div>`:"";
+  const wr=mine?whyRule(run):{required:true,min:1};
+  $("#whyReq").textContent=wr.min>=20?"(obrigatório · mín. 20 caracteres)":"(obrigatório · não pode ficar vazio)";
+  if(mine&&run&&run.status==="feasible"&&!(run.reasons||[]).length&&!$("#decWarn").innerHTML)$("#decWarn").innerHTML=`<div class="alert ok" id="decClean">✓ Factível sem razões: porquê pode ser curto, mas não vazio (regra PO) — ao aprovar e ao escalar.</div>`;
+  const done=S.decided&&S.decided.id===s.id&&S.decided.v===s.v;
+  /* v0.2.3 gate de alçada (só no cenário em análise) */
+  const qi=mine?myQ():null,toFin=mine&&G.salesBlocked&&oc!=="infeasible";
+  let ab="";
+  if(mine){
+    const CADL=`<a class="link" href="${SHELL}#cadastro/alcadas" target="_blank" rel="noopener">Cadastro · Políticas · Alçadas ↗</a>`;
+    if(G.oop)ab=`<div class="alert warn" id="decAlcada" data-failopen="1"><b>POL-04 fora do pack do tenant — gate sem alçada (fail-open).</b>Único caso sem bloqueio: o pack deste tenant não inclui alçada Finance. Investimento ${fmtMi(G.inv)} não vai para a Fila; regras do porquê valem. Para ligar, inclua POL-04 no pack em ${CADL}.</div>`;
+    else if(G.none&&G.salesBlocked)ab=`<div class="alert gap" id="decAlcada" role="alert" data-failclosed="1"><b>⛔ Sem alçada publicada = alçada ${fmtMi(0)} · configure no Cadastro — Sales não aprova (${fmtMi(G.inv)} &gt; ${fmtMi(0)}).</b>Fail-closed (PO): política de alçada ausente ou POL-04 sem limiar conta como alçada 0, então qualquer investimento &gt; 0 bloqueia Aprovar. Escale para Finance (Fila de alçada · <code>pending_finance</code>) ou publique a alçada em ${CADL}.${oc==="infeasible"?" Plano infactível: escale para o domain owner primeiro.":""} <span class="hint">Fonte: ${esc(G.src)}.</span></div>`;
+    else if(G.none&&G.over)ab=`<div class="alert info" id="decAlcada" data-failclosed="1"><b>Sem alçada publicada = alçada ${fmtMi(0)} — você está como Finance.</b>Aprovar registra actor.role=finance; regras do porquê valem. Configure a alçada em ${CADL}.</div>`;
+    else if(G.none)ab=`<div class="alert warn" id="decAlcada" data-failclosed="1"><b>Sem alçada publicada = alçada ${fmtMi(0)} · configure no Cadastro.</b>Investimento ${fmtMi(G.inv)} (não passa de 0): Sales aprova pela regra do porquê. Qualquer investimento &gt; 0 bloqueia. ${CADL}</div>`;
+    else if(G.salesBlocked)ab=`<div class="alert gap" id="decAlcada" role="alert"><b>⛔ Acima da alçada Finance (${fmtMi(G.inv)} &gt; ${fmtMi(G.alc)}) — Sales não aprova; escalar para Finance.</b>Escalar grava o DecisionEvent (action=escalate, actor.role=sales) e põe o pacote na Fila de alçada · Pulse do shell com status <code>pending_finance</code>.${oc==="infeasible"?" Plano infactível: escale para o domain owner primeiro (Finance não tem plano para aprovar).":""} <span class="hint">Fonte: ${esc(G.src)}.</span></div>`;
+    else if(G.over)ab=`<div class="alert info" id="decAlcada"><b>Acima da alçada Finance (${fmtMi(G.inv)} &gt; ${fmtMi(G.alc)}) — você está como Finance.</b>Aprovar registra actor.role=finance; regras do porquê valem.</div>`;
+    else ab=`<div class="alert ok" id="decAlcada"><b>✓ Dentro da alçada (${fmtMi(G.inv)} ≤ ${fmtMi(G.alc)}) — Sales aprova.</b>Regras do porquê valem. <span class="hint">Fonte: ${esc(G.src)}.</span></div>`;
+    if(qi){const [l,c]=QST[qi.status]||[qi.status,""],last=(qi.events||[]).slice(-1)[0];
+      ab+=`<div class="alert ${c==="ok"?"ok":c==="gap"?"gap":"info"}" id="decQueue"><b>Fila de alçada: <span class="tag ${c}">${l}</span> <code>${qi.status}</code></b>${qi.id} · v${qi.scenarioVersion} · ${qImp(qi)==null?"—":fmtMi(qImp(qi))} vs. alçada ${qi.alcadaMi==null?"—":fmtMi(qi.alcadaMi)}${last?` · último: ${last.action} por ${last.actor.role}${last.why?` — “${esc(last.why)}”`:""}`:""}. <a class="link" href="${SHELL}#pulse" target="_blank" rel="noopener">Ver no Pulse ↗</a></div>`;}
+  }
+  $("#decWarn").innerHTML=ab+$("#decWarn").innerHTML;
+  const lockQ=!!(qi&&ALC.role==="sales");
+  $("#decide").disabled=$("#escalate").disabled=!!done||lockQ;
+  if(mine&&oc==="infeasible"){$("#decide").disabled=true;$("#decide").title="Plano infactível não é aprovável";}
+  else if(mine&&G.salesBlocked){$("#decide").disabled=true;$("#decide").title=G.none?`Sem alçada publicada = alçada ${fmtMi(0)} — Sales não aprova (fail-closed)`:`Acima da alçada Finance (${fmtMi(G.inv)} > ${fmtMi(G.alc)}) — Sales não aprova`;}
+  else $("#decide").title=lockQ?"Já está na Fila de alçada":"";
+  $("#decide").className=toFin?"btn":"btn primary lg";$("#escalate").className=toFin?"btn primary lg":"btn";
+  $("#escalate").textContent=toFin?"Escalar para Finance":"Escalar para domain owner";
+  $("#escalate").setAttribute("aria-label",toFin?(G.none?"Escalar decisão para Finance (sem alçada publicada, alçada 0)":"Escalar decisão para Finance (acima da alçada)"):"Escalar decisão para o domain owner");
+  $("#add4").disabled=scenarios.some(x=>x.id===CANDIDATE.id)||archived.some(x=>x.id===CANDIDATE.id);
+  $("#add4").title=$("#add4").disabled?"Nenhum outro cenário pronto para comparar":"";
+}
+let lastFocus=null;
+function openModal(){lastFocus=document.activeElement;
+  $("#modalList").innerHTML=scenarios.map(s=>{const locked=s.id==="SCN-0142";return `<div class="kv"><span><b style="color:var(--ink)">${esc(s.name)}</b> · ${s.id}</span><span>${locked?'<span class="hint">em análise — não pode sair</span>':`<button class="btn" data-arch="${s.id}" aria-label="Arquivar ${esc(s.name)} e incluir Fornecedor B +2 dias">Arquivar e substituir</button>`}</span></div>`}).join("");
+  $("#modal").classList.add("show");($("#modal [data-arch]")||$("#mCancel")).focus();
+  $$("[data-arch]").forEach(b=>b.onclick=()=>{const id=b.dataset.arch,i=scenarios.findIndex(s=>s.id===id),old=scenarios[i];
+    archived.push(old);scenarios[i]={...CANDIDATE};if(selected===id)selected=CANDIDATE.id;
+    log("Usuário",`Arquivou ${old.name} (${old.id}) e incluiu ${CANDIDATE.name} (${CANDIDATE.id}) na comparação`);closeModal();renderCockpit();});}
+function closeModal(){if(!$("#modal").classList.contains("show"))return;$("#modal").classList.remove("show");lastFocus&&lastFocus.focus&&lastFocus.focus();}
+$("#add4").onclick=()=>{if(scenarios.length<3){scenarios.push({...CANDIDATE});renderCockpit();return;}openModal();};
+$("#mCancel").onclick=closeModal;
+$("#modal").addEventListener("click",e=>{if(e.target.id==="modal")closeModal();});
+function decide(kind){
+  const why=$("#why").value.trim();
+  const s0=scenarios.find(x=>x.id===selected),run=S.lastRun,mine=!!(s0&&s0.id==="SCN-0142");
+  const wr=kind==="ok"&&mine?whyRule(run):{required:true,min:1};
+  const G=gate();
+  if(kind==="ok"&&mine&&G.salesBlocked){$("#whyErr").innerHTML=`<div class="err" id="alcErr">${G.none?`Sem alçada publicada = alçada ${fmtMi(0)} (fail-closed)`:`Acima da alçada Finance (${fmtMi(G.inv)} &gt; ${fmtMi(G.alc)})`}: Sales não aprova. Use “Escalar para Finance” ou configure no Cadastro.</div>`;return;}
+  if(!why){$("#why").setAttribute("aria-invalid","true");$("#whyErr").innerHTML=`<div class="err">Escreva o porquê. Decisão sem justificativa não entra no audit trail.</div>`;$("#why").focus();return;}
+  if(kind==="ok"&&s0&&s0.id==="SCN-0142"&&run&&run.outcome==="infeasible"){$("#whyErr").innerHTML=`<div class="err">Plano infactível não é aprovável. Use “Escalar”.</div>`;return;}
+  if(kind==="ok"&&mine&&wr.min>=20&&why.length<20){$("#why").setAttribute("aria-invalid","true");$("#whyErr").innerHTML=`<div class="err">Plano com restrições warn/block/parcial: explique qual restrição você aceita (mín. 20 caracteres).</div>`;$("#why").focus();return;}
+  $("#why").removeAttribute("aria-invalid");$("#whyErr").innerHTML="";
+  const s=scenarios.find(x=>x.id===selected);S.decided={id:s.id,v:s.v,kind};
+  const role=ALC.role==="finance"?"finance":"sales",who=role==="finance"?"Usuário (Finance)":"Usuário (Sales)";
+  const ver=mine?S.scnVersion:(parseInt(String(s.v).replace(/\D/g,""),10)||1);
+  /* DecisionEvent.why: sempre texto do usuário (minLength 1, regra PO Task 7) */
+  const toFin=kind!=="ok"&&mine&&G.salesBlocked&&!(run&&run.outcome==="infeasible");
+  /* v0.2.4 · DecisionEvent v0.2: impactMi/alcadaMi no cenário em análise (approve e escalate); escalateTo só no escalate */
+  const X=mine?{impactMi:G.inv,alcadaMi:G.oop?null:G.alc}:{};
+  if(kind!=="ok")X.escalateTo=toFin?"finance":"domain_owner";
+  const ev=decisionEvent(kind==="ok"?"approve":"escalate",why,role,s.id,ver,mine&&run?run.id:null,X);decisionEvents.push(ev);
+  if(kind==="ok"){$("#decMsg").innerHTML=`<div class="alert ok">✓ Plano de <b>${esc(s.name)}</b> (${s.id} ${s.v}) aprovado${role==="finance"?" por Finance":""}. Export gerado: <span class="link">plano_${s.id}_${s.v}.xlsx</span> (sem write-back na V0). <span class="hint">DecisionEvent ${ev.id}</span></div>`;log(who,`Aprovou ${s.name} ${s.v} — "${why}" (${ev.id})`);
+    if(mine&&role==="finance"){const q=queueRead(),it=q.filter(i=>i.scenarioId==="SCN-0142"&&i.scenarioVersion===ver&&i.status==="pending_finance").pop();if(it){it.status="approved_finance";it.escalateTo=null;it.updatedAt=ev.at;(it.events=it.events||[]).push(ev);queueWrite(q);log("Wire (alçada)",`${it.id} → approved_finance`);}}}
+  else if(toFin){
+    const q=queueRead();q.forEach(i=>{if(i.scenarioId==="SCN-0142"&&i.scenarioVersion<ver&&i.status==="pending_finance"){i.status="stale";i.updatedAt=ev.at;}});
+    /* v0.2.4 · AlcadaQueueItem do schema (additionalProperties:false): mesmos impactMi/alcadaMi do evento */
+    const item={id:`AQ-0142-v${ver}`,scenarioId:s.id,scenarioVersion:ver,name:s.name,runId:run?run.id:null,impactMi:ev.impactMi,alcadaMi:ev.alcadaMi,
+      policyRef:polRefRead(),status:"pending_finance",escalateTo:"finance",events:[ev],createdAt:ev.at,updatedAt:ev.at};
+    const ix=q.findIndex(i=>i.id===item.id);if(ix>-1)q[ix]=item;else q.push(item);
+    const ok=(queueWrite(q),queueRead().some(i=>i.id===item.id));
+    $("#decMsg").innerHTML=ok?`<div class="alert warn" id="escFin">↑ <b>Escalado para Finance</b> — ${fmtMi(G.inv)} &gt; alçada ${alcLbl(G)}. Pacote <b>${item.id}</b> na Fila de alçada com status <code>pending_finance</code>: aparece em <a class="link" href="${SHELL}#pulse" target="_blank" rel="noopener">Pulse · Decisões pendentes ↗</a> e na Fila de alçada (Visões · Finance). <span class="hint">DecisionEvent ${ev.id} · actor.role=sales</span></div>`
+      :`<div class="alert gap">Não deu para gravar a fila (localStorage indisponível neste navegador). O DecisionEvent ${ev.id} ficou só no audit trail deste wire.</div>`;
+    log(who,`Escalou ${s.name} ${s.v} para Finance (${fmtMi(G.inv)} > alçada ${alcLbl(G)}) — "${why}" (${ev.id})`);log("Wire (alçada)",`${item.id} → ibp.alcada.queue · pending_finance`);}
+  else{
+    if(mine&&role==="finance"){const q=queueRead(),it=q.filter(i=>i.scenarioId==="SCN-0142"&&i.scenarioVersion===ver&&i.status==="pending_finance").pop();if(it){it.status="escalated_owner";it.escalateTo="domain_owner";it.updatedAt=ev.at;(it.events=it.events||[]).push(ev);queueWrite(q);log("Wire (alçada)",`${it.id} → escalated_owner`);}}$("#decMsg").innerHTML=`<div class="alert warn">↑ Escalado para o domain owner IBP com premissas + plano + violações + 3 opções. Prazo de decisão: 48h. <span class="hint">DecisionEvent ${ev.id}</span></div>`;log("A7 Integrator",`Escalou ${s.name} ${s.v} para domain owner — "${why}" (${ev.id})`);}
+  $("#why").value="";renderCockpit();
+}
+$("#why").addEventListener("input",()=>{if($("#why").value.trim()){$("#why").removeAttribute("aria-invalid");$("#whyErr").innerHTML="";}});
+$("#decide").onclick=()=>decide("ok");$("#escalate").onclick=()=>decide("esc");
+function renderAudit(){$("#audit").innerHTML=audit.map(a=>`<li><time>${a.t}</time><b>${esc(a.who)}</b> · ${esc(a.what)}</li>`).join("")||"<li class='hint'>Nenhum evento ainda. Comece pelo ditado.</li>";}
+
+/* ---------- contrato (gaveta) ---------- */
+function liveJson(){
+  const run=S.lastRun?{runId:S.lastRun.id,scenarioId:"SCN-0142",scenarioVersion:S.lastRun.scnVersion,status:S.lastRun.status,reasons:S.lastRun.reasons,countsByKind:S.lastRun.countsByKind}:null;
+  const R=readiness();
+  $("#liveJson").textContent=JSON.stringify({sim:SIM.state,a4Readiness:{state:R.state,met:R.met,need:R.need,pct:R.pct,items:R.items.map(({key,status,required,entity})=>({key,status,required,entity,by:[]})),scope:R.scope},premiseCards:cards,scenario:{id:"SCN-0142",version:S.scnVersion,generated:S.scnGenerated,stale:isStale()},a4RunSummary:run,alcadaGate:gate(),decisionEventSchema:"decision-event.schema.json v0.2",decisionEvents,alcadaQueue:queueRead()},null,2);
+}
+function openContract(){liveJson();const d=$("#contract");d.classList.add("show");d.setAttribute("aria-hidden","false");$("#openContract").setAttribute("aria-expanded","true");$("#closeContract").focus();}
+function closeContract(){const d=$("#contract");if(!d.classList.contains("show"))return;d.classList.remove("show");d.setAttribute("aria-hidden","true");$("#openContract").setAttribute("aria-expanded","false");$("#openContract").focus();}
+$("#openContract").onclick=()=>$("#contract").classList.contains("show")?closeContract():openContract();
+$("#closeContract").onclick=closeContract;$("#liveRefresh").onclick=liveJson;
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if($("#modal").classList.contains("show"))closeModal();else closeContract();}});
+
+$$('[name="sim"]').forEach(r=>r.onchange=()=>r.checked&&setSim(r.value));
+$$("[data-rk]").forEach(c=>{c.checked=!!SIM.ready[c.dataset.rk];c.onchange=()=>{SIM.ready[c.dataset.rk]=c.checked;if(SIM.state==="blocked")setSim("blocked");};});
+$("#simSupply").onchange=e=>{SIM.supply=e.target.checked;if(SIM.state==="blocked")setSim("blocked");};
+function simRef(val){const ci=cards.findIndex(c=>c.type==="Gap");if(ci<0)return;const c=cards[ci];c.links.nodeId=val;c.version++;c.source="edit";
+  log("Wire (sim)",`${c.id}.links.nodeId → ${val??"null"} (v${c.version})`);premiseChanged(`${c.id} nó → ${val??"vazio"} (sim)`);if(S.cur!==2&&S.unlocked>=2)go(2);}
+$("#simBadRef").onclick=()=>simRef("CD3@v1");$("#simNullRef").onclick=()=>simRef(null);
+{const q=new URLSearchParams(location.search).get("a4");setSim(q||"ready",{silent:true});}
+{const P=new URLSearchParams(location.search),a=P.get("alcada"),r=P.get("role");
+  if(a)ALC.override=a==="over"?2:a==="under"?5:a==="none"||a==="outofpack"?a:(isNaN(parseFloat(a))?null:parseFloat(a));
+  if(r==="finance"||r==="sales")ALC.role=r;}
+$$('[name="simRole"]').forEach(r=>r.onchange=()=>{if(!r.checked)return;ALC.role=r.value;log("Wire (sim)",`Papel no cockpit → ${r.value}`);alcadaChanged();});
+$$('[name="simAlcV"]').forEach(r=>r.onchange=()=>{if(!r.checked)return;ALC.override=r.value==="shell"?null:r.value==="none"||r.value==="outofpack"?r.value:+r.value;log("Wire (sim)",`Alçada → ${r.value==="shell"?"do shell":r.value==="none"?"sem política":"{$} "+r.value+" mi"} (override)`);alcadaChanged();});
+$("#simQClear").onclick=()=>{try{localStorage.removeItem(LS_Q);}catch(e){}S.decided=null;$("#decMsg").innerHTML="";log("Wire (sim)","Fila de alçada limpa (ibp.alcada.queue)");alcadaChanged();};
+window.addEventListener("storage",e=>{if(e.key===LS_ALC||e.key===LS_Q||e.key===LS_PR||e.key===null)alcadaChanged();});
+renderAlcSim();
+$("#tcJson").textContent=JSON.stringify(tenantConfig,null,2);
+applyTk(document.body);
+renderStepper();renderAudit();
+</script>
+</body>
+</html>

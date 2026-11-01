@@ -1,0 +1,80 @@
+{
+  "profile_id": "oilgas",
+  "name": "Óleo & gás (distribuição)",
+  "sim": false,
+  "labels": {
+    "node": "Terminal",
+    "capacity": "tancagem",
+    "route": "Modal",
+    "sku": "Produto",
+    "contract": "Contrato de suprimento",
+    "capacity_uom": "m³"
+  },
+  "uom": "L",
+  "node_types": [
+    "Terminal",
+    "Base",
+    "Refinaria"
+  ],
+  "kpi_labels": {
+    "svc": "Nível de serviço",
+    "wcp": "DIO",
+    "wc": "Capital de giro",
+    "cost": "Custo logístico",
+    "viol": "Violações de política"
+  },
+  "policy_kinds": {
+    "working_capital": [
+      "working_capital",
+      "capital_de_giro",
+      "wc",
+      "capital_giro_produto"
+    ],
+    "inventory": [
+      "inventory",
+      "estoque",
+      "stock",
+      "estoque_tancado",
+      "lastro"
+    ],
+    "service": [
+      "service",
+      "servico",
+      "service_level",
+      "nivel_servico"
+    ],
+    "alcada": [
+      "alcada",
+      "alcada_finance"
+    ]
+  },
+  "alcada": {
+    "defaultLimitMi": 2,
+    "name": "Alçada Finance investimento"
+  },
+  "agents": {
+    "A1": {
+      "enabled": true
+    },
+    "A2": {
+      "enabled": true
+    },
+    "A3": {
+      "enabled": true
+    },
+    "A4": {
+      "enabled": true,
+      "solver": "cbc"
+    },
+    "A5": {
+      "enabled": false
+    },
+    "A6": {
+      "enabled": true
+    },
+    "A7": {
+      "enabled": false,
+      "mode": "state_machine_only"
+    }
+  }
+}

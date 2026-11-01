@@ -1,0 +1,70 @@
+# T-A4-SOLVER-WORKER — test log (2026-10-31 21:24 -03)
+## md5
+96cbdce77c8152196731a369d7cec7b8  docs/architecture/A4-SOLVER-WORKER-CONTRACT.md
+2e1fdb610bc2467b8efd16c624333908  public/index.html
+1157a1351d3e1d965dc2295269b79415  src/a4/solve.ts
+96efcd1faccf782c485b37ec1d85c69c  src/http/a4-runs.ts
+8d1a50de4d96410b3bbaa63906948074  solver/cbc_solve.py
+ba564eacb2ed6b364d0c54a4b101df6c  solver/worker.py
+de877aff27a8edbf6f033b9e287cbe0f  solver/Dockerfile
+25ed1dfb490109b5991932dbabeaa134  harness/scripts/w2-grep-gate.sh
+## migrations (último)
+0018_sales_history_period_grain_unique.sql
+## npm run typecheck
+> tsc --noEmit
+
+exit 0
+## npm run gate
+W2 grep gate OK (src)
+W2 grep gate OK (db)
+W2 grep gate OK (test)
+W2 grep gate OK (contracts)
+W2 grep gate OK (solver)
+W2 grep gate OK (packs)
+## npm test (T-A4 files)
+✔ worker down (A4_SOLVER_URL inacessível) → 503 {error:{code:solver_unavailable}} e nenhum run criado (310.991432ms)
+✔ worker real via A4_SOLVER_URL → 202 + run done/partial (solve passou pelo HTTP do worker) (141.862945ms)
+✔ health ok mas secret errado → 202 e run failed com error estável 'solver_unavailable' (sem URL/stack) (139.442419ms)
+✔ A4_SOLVER_URL unset → comportamento W1c (202 + spawn local) intacto (147.942176ms)
+✔ remoteSolverUrl: unset/vazio → null; barra final removida (0.935458ms)
+✔ A4_SOLVER_URL set + 200 → POST /v1/solve com secret header e body = modelo; SolveResult devolvido (26.182584ms)
+✔ 200 com status não-ótimo (infeasible, objective null, values {}) passa adiante como hoje (5.961834ms)
+✔ 401 (secret errado) → solver_unavailable (4.883894ms)
+✔ 500 / 503 → solver_unavailable (4.53265ms)
+✔ 200 com JSON inválido ou shape errado → solver_unavailable (4.873017ms)
+✔ timeout (worker pendurado) → solver_unavailable em ~timeLimitMs+grace; erro sem URL/stack (201.956591ms)
+✔ cap de timeout HTTP = 25s (contrato §1/§4) (0.223728ms)
+✔ rede recusada (worker down) → solver_unavailable (1.970616ms)
+✔ preflight remoteSolverHealthy: 200 {ok:true} → true; 503 / ok≠true / down / pendurado (timeout) → false (209.252345ms)
+✔ A4_SOLVER_URL unset → spawn local (CBC real) — regressão dev/CI (56.35374ms)
+✔ GET /health → 200 {ok:true} sem auth (148.943719ms)
+✔ POST /v1/solve fixture LP → 200 optimal, mesmo JSON (chaves/valores) do stdout de cbc_solve.py (68.363331ms)
+✔ infeasible → 200 status infeasible, objective null, values {} (igual cbc_solve.py) (3.363675ms)
+✔ 401: secret ausente ou errado (5.218903ms)
+✔ 400: JSON inválido / campos faltando / var desconhecida; 404 rota fora do contrato (13.202598ms)
+✔ secret nunca aparece no log do worker (0.181342ms)
+✔ fail-closed: sem A4_SOLVER_SECRET o worker não sobe (exit 2) (74.360993ms)
+✔ Node solve() via A4_SOLVER_URL (worker real) ≡ spawn local no LP do piloto (61.469783ms)
+ℹ tests 23
+ℹ pass 23
+ℹ fail 0
+## npm test (full)
+ℹ tests 204
+ℹ pass 204
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+## docker build solver/ (tail)
+Successfully built e0e5f2e43bf6
+Successfully tagged a4-solver:local
+exit 0
+## docker smoke (container local, secret=smoke)
+## health
+{"ok": true} 200
+## solve ok
+{"status": "optimal", "objective": 10.0, "values": {"x": 10.0, "y": 0.0}, "wallMs": 1} 200
+## 401
+{"error": "unauthorized"} 401
+## 400
+{"error": "invalid_json"} 400
+no-secret run → exit 2 (fail-closed)

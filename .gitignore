@@ -1,0 +1,12 @@
+**/tmp_*/
+*.bak-*
+*.log
+.env
+.vercel
+backups/
+dist/
+node_modules/
+solver/.venv/
+tmp_*/
+var/
+vercel.json.bak-*

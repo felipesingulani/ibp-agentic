@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Modelo de dados · IBP Agentic (V0 até 0018)</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+:root{--bg:#0f1420;--panel:#161d2d;--panel2:#1d2639;--line:#2a3550;--txt:#e6ebf5;--mut:#9aa6bf;--acc:#6ea8fe;--pk:#f2c94c;--fk:#56cc9d;--uk:#bb86fc;--warn:#f2994a;--blk:#eb5757}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--txt);display:grid;grid-template-columns:250px 1fr;min-height:100vh}
+a{color:var(--acc)}
+code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:#0b1019;border:1px solid var(--line);padding:1px 5px;border-radius:4px}
+nav{position:sticky;top:0;height:100vh;overflow:auto;background:#0b1019;border-right:1px solid var(--line);padding:18px 14px}
+nav h1{font-size:15px;margin:0 0 4px}
+nav .sub{color:var(--mut);font-size:12px;margin-bottom:16px}
+nav a{display:block;color:var(--txt);text-decoration:none;padding:7px 10px;border-radius:7px;font-size:14px}
+nav a:hover,nav a.on{background:var(--panel2);color:#fff}
+nav a .n{color:var(--mut);font-size:12px;margin-right:6px}
+nav .ents{margin:4px 0 10px 14px;border-left:1px solid var(--line)}
+nav .ents a{font-size:12.5px;padding:3px 10px;color:var(--mut)}
+main{min-width:0}
+.bar{position:sticky;top:0;z-index:10;background:rgba(15,20,32,.94);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);padding:10px 26px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.bar .lbl{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.tg{display:inline-flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 11px;font-size:13px;cursor:pointer;user-select:none}
+.tg input{accent-color:var(--acc);margin:0}
+.tg.pk b{color:var(--pk)}.tg.fk b{color:var(--fk)}
+.btn{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:7px;padding:4px 10px;font-size:13px;cursor:pointer}
+.btn:hover{border-color:var(--acc)}
+.bar input[type=search]{background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:5px 10px;min-width:180px}
+.wrap{padding:22px 26px 80px;max-width:1300px}
+section{margin:0 0 46px;scroll-margin-top:70px}
+section>h2{font-size:22px;margin:0 0 6px;border-bottom:1px solid var(--line);padding-bottom:8px}
+h3{font-size:16px;margin:22px 0 8px}
+p,li{color:#cfd6e6}
+.muted{color:var(--mut)}
+.callout{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:8px;padding:12px 16px;margin:12px 0}
+.callout.warn{border-left-color:var(--warn)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.diagram{color:#1b2333;background:#fbfcfe;border:1px solid var(--line);border-radius:10px;margin:12px 0;position:relative}
+.diagram .tools{position:absolute;top:8px;right:8px;display:flex;gap:6px;z-index:2}
+.diagram .tools .btn{background:#fff;color:#223;border-color:#ccd}
+.diagram .vp{overflow:auto;max-height:78vh;padding:14px}
+.diagram .vp svg{max-width:none!important;height:auto;transform-origin:0 0}
+.diagram .vp p,.diagram .vp span,.diagram .vp div{color:#1b2333}
+.diagram .vp .edgeLabel p,.diagram .vp .edgeLabel span{color:#4a3d8f}
+.diagram .err{color:#b00;font:12px monospace;white-space:pre-wrap;padding:14px}
+.diagram details{border-top:1px solid #dde;padding:6px 14px;color:#334;font-size:12px}
+.diagram details pre{white-space:pre-wrap;font-size:11.5px;max-height:260px;overflow:auto}
+.diagram.full{position:fixed;inset:10px;z-index:100;margin:0}
+.diagram.full .vp{max-height:calc(100vh - 80px)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;margin-top:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;scroll-margin-top:80px}
+.card.flash{outline:2px solid var(--acc)}
+.card summary{list-style:none;cursor:pointer;padding:12px 14px}
+.card summary::-webkit-details-marker{display:none}
+.card .nm{font:600 14px ui-monospace,Menlo,monospace;color:#fff}
+.card .tt{color:var(--mut);font-size:13px;margin-left:6px}
+.card .pp{margin:6px 0 0;font-size:13.5px;color:#cfd6e6}
+.card .meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.pill{font-size:11px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--mut)}
+.pill.v{color:#9fd1ff;border-color:#2e5a85}
+.card .body{padding:0 14px 12px}
+.card td{font-size:12.5px;padding:4px 6px}
+.card td.c{font-family:ui-monospace,Menlo,monospace;color:#fff;white-space:nowrap}
+.card td.t{font-family:ui-monospace,Menlo,monospace;color:var(--mut)}
+.k{display:inline-block;font:700 10px ui-monospace,monospace;border-radius:3px;padding:0 4px;margin-right:3px}
+.k.P{background:var(--pk);color:#221}.k.F{background:var(--fk);color:#032}.k.U{background:var(--uk);color:#203}
+body.hidePK .colP:not(.colF), body.hideFK .colF:not(.colP){display:none}
+body.hidePK.hideFK .colP.colF{display:none}
+body.hideOther .colO{display:none}
+body.hideTenant .colT{display:none}
+.flow td:first-child{white-space:nowrap}
+.st{font-weight:700}.st.ok{color:var(--fk)}.st.warn{color:var(--warn)}.st.block{color:var(--blk)}
+footer{color:var(--mut);font-size:12px;border-top:1px solid var(--line);padding-top:12px}
+@media(max-width:900px){body{grid-template-columns:1fr}nav{position:static;height:auto}}
+</style>
+</head>
+<body>
+<nav id="nav">
+  <h1>Modelo de dados</h1>
+  <div class="sub">IBP Agentic · V0 até migration 0018 (W7 + T-DM High 1+2)<br>Deivid (Arquiteto) · sync 31/10/2026 ~17:20 America/Sao_Paulo · 0018 sales_history period YYYY-MM + qty≥0 + UNIQUE</div>
+  <a href="#resumo"><span class="n">0</span>Resumo</a>
+  <a href="#geral"><span class="n">★</span>Visão geral</a>
+  <a href="#multi"><span class="n">1</span>Multi-tenant</a><div class="ents" data-dom="multi"></div>
+  <a href="#cadastro"><span class="n">2</span>Cadastro + versionamento</a><div class="ents" data-dom="cadastro"></div>
+  <a href="#settings"><span class="n">3</span>tenant_settings</a><div class="ents" data-dom="settings"></div>
+  <a href="#runtime"><span class="n">4</span>Runtime</a><div class="ents" data-dom="runtime"></div>
+  <a href="#unlock"><span class="n">5</span>Destravar “Novo cenário”</a>
+  <a href="#chaves"><span class="n">6</span>Mapa das chaves</a>
+  <a href="#fora"><span class="n">7</span>Fora do V0</a>
+</nav>
+<main>
+<div class="bar">
+  <span class="lbl">Mostrar</span>
+  <label class="tg pk"><input type="checkbox" id="tPK" checked><b>PK</b> chaves primárias</label>
+  <label class="tg fk"><input type="checkbox" id="tFK" checked><b>FK</b> chaves estrangeiras</label>
+  <label class="tg"><input type="checkbox" id="tOther" checked>demais colunas</label>
+  <label class="tg"><input type="checkbox" id="tTenant">tenant_id</label>
+  <label class="tg"><input type="checkbox" id="tRel" checked>linhas de relação</label>
+  <label class="tg"><input type="checkbox" id="tTenRel">linhas → tenants</label>
+  <label class="tg"><input type="checkbox" id="tCmt">comentários no diagrama</label>
+  <button class="btn" data-preset="clean">Só entidades</button>
+  <button class="btn" data-preset="keys">Só chaves</button>
+  <button class="btn" data-preset="all">Tudo</button>
+  <input type="search" id="q" placeholder="filtrar entidade/coluna…">
+</div>
+<div class="wrap">
+
+<section id="resumo">
+  <h2>0 · Resumo em 30 segundos</h2>
+  <div class="grid2">
+    <div class="callout"><b>Um Postgres, vários clientes.</b> Toda linha tem <code>tenant_id</code> e o próprio banco esconde as linhas dos outros clientes (RLS).</div>
+    <div class="callout"><b>Cadastro (master data)</b> — políticas, nós, capacidade, rotas, SKUs, contratos, vendas, drivers financeiros. <b>Versionado</b>: editar cria versão nova; nada é apagado.</div>
+    <div class="callout"><b>Runtime</b> — cenários, cartões de premissa, execuções do otimizador A4, decisões (aprovar/escalar), movimentos de execução (0014) e journeys D3 (0015). Export do plano aprovado (W7) = só leitura + audit, sem migration.</div>
+    <div class="callout"><b>Novo cenário só destrava</b> quando o cliente confirmou o cadastro (<code>confirmed_at</code>) <b>e</b> a prontidão do A4 não está <span class="st block">block</span>.</div>
+  </div>
+  <p class="muted">Fonte da verdade: <code>contracts/v0-postgres-cadastro.sql</code> (baseline “0001”) + <code>db/migrations/0002…0018</code> + contratos W4–W7 + A1 CurvaDemanda (`a1.curva.v1`, sem DDL). <b>0018</b>: <code>sales_history</code> CHECK <code>period</code> só <code>YYYY-MM</code> + CHECK <code>qty &gt;= 0</code> + UNIQUE <code>(tenant_id, node_id, sku_id, period, source)</code>; reimport da mesma chave → API <code>409</code> (sem upsert V0); sem backfill; aplicada no Neon prod 31/10 17:09 America/Sao_Paulo (<code>dpl_87QxbREJhZdskjfUoLSzZ3gSgwAm</code>). Se esta página e o SQL divergirem, <b>vale o SQL</b>. Texto completo em <a href="DATA-MODEL.md">DATA-MODEL.md</a>.</p>
+  <p class="muted">Como usar: os botões no topo ligam/desligam PK, FK e demais colunas — nos diagramas <i>e</i> nos cartões. Clique numa entidade do diagrama para pular até o cartão dela. “Só entidades” deixa só as caixas e as setas.</p>
+</section>
+
+<section id="geral">
+  <h2>★ Visão geral (todas as tabelas)</h2>
+  <p class="muted">Com <code>tenant_id</code> e as linhas para <code>tenants</code> ocultas por padrão (todas as tabelas apontam pra lá — ligue nos toggles se quiser ver).</p>
+  <div class="diagram" data-diagram="geral"></div>
+</section>
+
+<section id="multi">
+  <h2>1 · Multi-tenant: um cliente nunca vê o dado do outro</h2>
+  <table>
+    <tr><th>Conceito</th><th>O que é</th><th>Na prática</th></tr>
+    <tr><td><code>tenants</code></td><td>Tabela de clientes (<code>id</code>, <code>slug</code>, <code>name</code>).</td><td>Um registro por empresa cliente.</td></tr>
+    <tr><td><code>tenant_id</code></td><td>Coluna em <b>toda</b> tabela de negócio.</td><td>“Essa linha é do cliente X.”</td></tr>
+    <tr><td>Header <code>x-tenant-id</code></td><td>Toda chamada à API manda o id do cliente (sem ele → <code>401</code>).</td><td>Stub hoje; login real entra numa wave futura e preenche o mesmo campo.</td></tr>
+    <tr><td>Header <code>x-user-id</code></td><td>Quem está agindo; obrigatório para escrita.</td><td>Vira <code>created_by</code> e o ator no <code>audit_log</code>.</td></tr>
+    <tr><td><code>app.tenant_id</code></td><td>A API grava o tenant numa variável de sessão; <code>app_tenant_id()</code> lê.</td><td>É assim que o banco “sabe” quem pergunta.</td></tr>
+    <tr><td><b>RLS</b></td><td>Regra em cada tabela: <code>tenant_id = app_tenant_id()</code> para ler e gravar.</td><td>Isolamento é do banco, não depende da aplicação lembrar de filtrar.</td></tr>
+    <tr><td><b>FORCE RLS</b></td><td>Regra vale até para o dono da tabela.</td><td><code>tenants</code>/<code>users</code>/<code>audit_log</code> + cadastro (0002), <code>tenant_settings</code> (0003), identidades (0006), <code>premise_cards</code> (0007), <code>a4_runs</code>/<code>scenarios</code> (0009), <code>decision_events</code> (0012), <code>execution_movements</code> (0014), <code>journey_runs</code> (0015). Toda tabela de negócio.</td></tr>
+    <tr><td>Role <code>ibp_app</code></td><td>Usuário de banco da API: sem superusuário, NOBYPASSRLS, grants mínimos (0004+). Sem INSERT em <code>tenants</code>/<code>users</code>.</td><td>Mesmo com bug na API, o banco não entrega dado de outro cliente.</td></tr>
+  </table>
+  <div class="callout warn"><b>Funções <code>SECURITY DEFINER</code> — únicas portas cross-tenant (só land da journey).</b> Ambas: <code>SET search_path</code>, <code>REVOKE PUBLIC</code> + <code>GRANT EXECUTE</code> só <code>ibp_app</code>, exigem journey do lab em <code>conviction</code> sem land (<code>FOR UPDATE</code>), trocam <code>app.tenant_id</code> via <code>set_config(…, true)</code> só durante o acesso ao outro tenant e <b>restauram o lab</b>.<br>
+  • <code>journey_land_tenant(run, slug, name)</code> — 0015, reescrita 0016: cria 1 tenant + 1 <code>admin</code> (land thin); slug duplicado → 409.<br>
+  • <code>journey_land_link(run, target, actor) → boolean</code> — 0017: <code>true</code> ⇔ mesmo e-mail do ator é <code>admin</code> no alvo; <code>false</code> uniforme (sem oráculo de existência → API <code>400 invalid_reference</code> byte-igual).</div>
+  <div class="callout"><b>Defesa extra — FK composta por tenant.</b> FK comum não olha RLS. Por isso as referências importantes usam <code>(tenant_id, id)</code> juntos: um cartão do cliente A não consegue apontar para um nó ou cenário do cliente B (o banco recusa; a API devolve <code>400 invalid_reference</code>).</div>
+  <div class="diagram" data-diagram="multi"></div>
+  <div class="cards" data-dom="multi"></div>
+</section>
+
+<section id="cadastro">
+  <h2>2 · Cadastro (master data) e versionamento</h2>
+  <h3>Como funciona a versão (o ponto mais importante)</h3>
+  <table>
+    <tr><th>Campo</th><th>Significado</th><th>Analogia</th></tr>
+    <tr><td><code>id</code></td><td>Id <b>daquela versão</b> (uma linha).</td><td>“A edição 3 do documento.”</td></tr>
+    <tr><td><code>stable_id</code> (0006)</td><td>Id <b>do objeto ao longo do tempo</b>; todas as versões compartilham.</td><td>“O documento, qualquer que seja a edição.”</td></tr>
+    <tr><td><code>version</code> + <code>is_current</code></td><td>Número da versão e se é a vigente. Banco garante no máximo <b>1 corrente por <code>stable_id</code></b>.</td><td>“Edição vigente.”</td></tr>
+  </table>
+  <ul>
+    <li><b>Editar</b> (<code>PATCH</code>, <code>why</code> obrigatório) = linha nova com o mesmo <code>stable_id</code>, <code>version + 1</code>; a anterior deixa de ser corrente.</li>
+    <li><b>Aposentar</b> (<code>DELETE</code>, com <code>why</code>) = nenhuma versão fica corrente. Nada é apagado.</li>
+    <li><b>Referências usam <code>stable_id</code></b>, não o <code>id</code> da versão — renomear um nó não quebra capacidade, rotas nem vendas.</li>
+    <li>Referenciar algo aposentado ou o id de uma versão específica → <code>400 invalid_reference</code>.</li>
+  </ul>
+  <div class="callout"><b>Tabelas de identidade</b> (<code>nodes_identity</code>, <code>skus_identity</code>, 0006): uma linha por <code>(tenant_id, stable_id)</code>, preenchidas por trigger quando nasce a 1ª versão. É contra elas que as FKs compostas apontam.</div>
+  <div class="callout warn"><b>Agnóstico de indústria (0003/0005):</b> tipos de nó, unidade, moeda e rótulos são configuração do tenant. Os nomes legados <code>capacity_t_month</code>/<code>cost_per_ton</code> ficam no SQL até a W0.2; a API já expõe <code>capacity_per_period</code>/<code>cost_per_unit</code>.</div>
+  <div class="diagram" data-diagram="cadastro"></div>
+  <div class="cards" data-dom="cadastro"></div>
+</section>
+
+<section id="settings">
+  <h2>3 · <code>tenant_settings</code> — configuração do cliente (1 linha por tenant)</h2>
+  <table>
+    <tr><th>Campo</th><th>Migration</th><th>Para que serve</th></tr>
+    <tr><td><code>currency</code></td><td>0003</td><td>Moeda (ISO 4217). <code>null</code> = não definida.</td></tr>
+    <tr><td><code>uom</code></td><td>0003</td><td>Unidade padrão de volume/capacidade.</td></tr>
+    <tr><td><code>node_types[]</code></td><td>0003</td><td>Tipos de nó aceitos (vazio = qualquer texto).</td></tr>
+    <tr><td><code>kpi_labels</code></td><td>0003</td><td>Como cada KPI aparece na tela (<code>{"chave": "rótulo"}</code>).</td></tr>
+    <tr><td><code>supply_external_in_scope</code></td><td>0008</td><td>“Compramos de terceiros?” Default <b>false</b>. <code>true</code> → contrato de fornecedor passa a ser exigido na prontidão; <code>false</code> → item aparece como <code>n/a</code>.</td></tr>
+    <tr><td><code>confirmed_at</code></td><td>0010</td><td>Quando o cliente <b>confirmou o cadastro</b>. Gravado só pelo servidor: <code>PUT /api/tenant-settings {confirmed:true}</code> → agora; <code>{confirmed:false}</code> → <code>null</code>. Mandar data direto → <code>400</code>.</td></tr>
+    <tr><td><code>industry_pack</code></td><td>0013</td><td>Pack de indústria (<code>generic|oilgas|cpg|retail|generic_no_alcada</code>, validado na API). <code>NULL</code> ≡ generic. Troca só via <code>POST /api/cadastro/pack</code>. CHECK não vazio.</td></tr>
+    <tr><td><code>entity_labels</code></td><td>0013</td><td>jsonb (objeto) — rótulos de entidade (seed do pack + overrides).</td></tr>
+    <tr><td><code>policy_kinds</code></td><td>0013</td><td>jsonb (objeto) — aliases canônicos de <code>policies.kind</code>; “pack inclui alçada” ≡ chave <code>alcada</code>. Lido pela prontidão e pelo A4 (F-1; <code>{}</code> → legado). Kind fora → warn <code>policy_kind_unknown</code> (W6).</td></tr>
+    <tr><td><code>agent_roster</code></td><td>0013</td><td>jsonb (objeto) — roster A1–A7 (só exibição V0).</td></tr>
+  </table>
+  <div class="diagram" data-diagram="settings"></div>
+  <div class="cards" data-dom="settings"></div>
+</section>
+
+<section id="runtime">
+  <h2>4 · Runtime: cenários, premissas, A4, decisões, execução e journey</h2>
+  <div class="grid2">
+    <div class="callout"><b>scenarios</b> — cenário versionado (<code>code</code>+<code>version</code>). <code>leg</code>: sales/supply/finance/composed · <code>status</code>: draft/ready/stale/archived. Criação pela API = <b>Task 6</b> (grant na 0011; ver <code>W2-WIZARD-API-CONTRACT.md</code>).</div>
+    <div class="callout"><b>premise_cards</b> — <code>type</code>: NovaFilial · CurvaDemanda · Investimento · <b>Gap</b>. Gap <b>precisa</b> de nó (CHECK no banco); <code>node_id</code> = <code>stable_id</code> de nó corrente (0007). Gap aberto → prontidão <span class="st warn">warn</span>. <b>A1 CurvaDemanda</b>: <code>fields.schema=a1.curva.v1</code> · 18 pts mensais + <code>anchor</code> · série server-side a partir de <code>sales_history</code> (≥6 períodos) · sem migration (ver <code>A1-CURVA-DEMANDA-CONTRACT.md</code>).</div>
+    <div class="callout"><b>a4_runs</b> — banco: <code>queued → running → feasible | partial | failed</code> (+ <code>discarded</code>). API simplifica: <code>done</code> + <code>outcome</code>. Até 3 <code>reasons</code> (<code>janela|capacidade|contrato|custo|outro</code>) + <code>counts_by_kind</code>. Rodar com prontidão <span class="st block">block</span> → <code>409 a4_not_ready</code>.</div>
+    <div class="callout"><b>decision_events</b> — <code>approve | escalate</code> com <code>why</code> obrigatório. API Task 7 / 0012: <code>POST/GET</code> append-only (SELECT+INSERT), FORCE RLS, FKs compostas. <code>exportRef</code> null V0 (W7 não preenche). <b>Sem write-back</b>.</div>
+    <div class="callout"><b>execution_movements</b> (W4 / 0014) — movimento programado/realizado por <b>dia</b> ligado a um run (mesmo cenário). <code>kind</code>: ship/receive/produce/transfer/other · <code>status</code>: posted → void (trigger; único UPDATE permitido) · sem DELETE. Exceção Pulse quando desvio <code>&gt; 15%</code>.</div>
+    <div class="callout"><b>journey_runs</b> (W5 / 0015 · W6) — learning journey no tenant lab. <code>status</code>: open/conviction/landed/abandoned · steps forçados leverage → consensus → roles → conviction (<code>409 steps_out_of_order</code>) · land só <code>admin|domain_owner</code> via funções definer. Sem DELETE.</div>
+    <div class="callout"><b>Export plano aprovado</b> (W7, sem migration) — <code>GET /api/plans/approved/export?format=json|csv</code>: só <code>basis=approved</code>, papéis <code>admin|domain_owner|finance</code>, números = <code>a4_runs.plan</code> cru, 1 linha <code>audit_log</code> (<code>export</code>).</div>
+  </div>
+  <div class="diagram" data-diagram="runtime"></div>
+  <div class="cards" data-dom="runtime"></div>
+</section>
+
+<section id="unlock">
+  <h2>5 · O que significa “destravar Novo cenário”</h2>
+  <div class="callout"><b>Regra:</b> <code>tenant_settings.confirmed_at IS NOT NULL</code> <b>E</b> prontidão do A4 <code>state ≠ block</code>.<br>Em português: <i>o cliente disse “meu cadastro está pronto”</i> e <i>o cadastro tem o mínimo pro otimizador rodar</i>.</div>
+  <div class="diagram" data-diagram="unlock"></div>
+  <h3>Prontidão — <code>GET /api/a4-readiness</code> (só versões correntes)</h3>
+  <table class="flow">
+    <tr><th>Item</th><th>Exigido quando</th><th>“ok” se…</th></tr>
+    <tr><td>Política</td><td>sempre</td><td>política corrente de capital de giro, <b>ou</b> estoque <b>+</b> serviço — grupos de <code>kind</code> de <code>tenant_settings.policy_kinds</code> (F-1; <code>{}</code> → legado <code>POLICY_KINDS</code>)</td></tr>
+    <tr><td>Capacidade</td><td>sempre</td><td>algum nó corrente com <code>node_capacity</code> corrente &gt; 0 (não vem do campo do nó)</td></tr>
+    <tr><td>Rota</td><td>sempre</td><td>existe rota corrente</td></tr>
+    <tr><td>Contrato de fornecedor</td><td>só com <code>supply_external_in_scope = true</code></td><td>existe contrato corrente (senão <code>n/a</code>)</td></tr>
+  </table>
+  <p><span class="st block">block</span> = falta item exigido · <span class="st warn">warn</span> = ok, mas há nó sem capacidade, Gap aberto ou kind fora do vocabulário (<code>policy_kind_unknown</code>, W6 — nunca block) · <span class="st ok">ok</span> = limpo.</p>
+  <ul>
+    <li><code>confirmed_at</code> <b>não</b> entra no <code>state</code>. A API devolve <code>unlock.new_scenario = confirmado && state ≠ block</code> para a UI (wire v0.3.2 da Didi).</li>
+    <li>Quem impõe no servidor é a <b>Task 6</b> (criar cenário): <code>403 scenario_locked</code> ou <code>409 a4_not_ready</code>.</li>
+    <li>Limitação conhecida: confirmar não é desfeito automaticamente se o cadastro mudar depois.</li>
+  </ul>
+</section>
+
+<section id="chaves">
+  <h2>6 · Mapa das chaves (quem aponta pra quem)</h2>
+  <table id="keymap"><tr><th>De</th><th>Para</th><th>Tipo</th></tr></table>
+</section>
+
+<section id="fora">
+  <h2>7 · Fora do V0 (de propósito)</h2>
+  <table>
+    <tr><th>Fora</th><th>Por quê / quando</th></tr>
+    <tr><td><s>Criar cenário pela API, ditado → cartões</s></td><td><b>feito (Task 6)</b> · grant 0011</td></tr>
+    <tr><td><s>Gravar <code>decision_events</code></s></td><td><b>feito (Task 7)</b> · export null V0</td></tr>
+    <tr><td><s>Alçada Finance, Pulse com fila</s></td><td><b>feito (W3/W3b)</b></td></tr>
+    <tr><td><s>Execução programada/realizada</s></td><td><b>feito (W4 / 0014)</b> · import CSV/SFTP fora</td></tr>
+    <tr><td><s>Journey D3 + land</s></td><td><b>feito (W5/W6 / 0015–0017)</b> · fora: scope filter, <code>abandon</code></td></tr>
+    <tr><td><s>Export plano aprovado</s></td><td><b>feito (W7, sem migration)</b> · fora: XLSX/PDF, latest_run, HEAD</td></tr>
+    <tr><td>A7 (narrativa LLM), A6 agente</td><td>waves seguintes</td></tr>
+    <tr><td><b>Write-back</b> no ERP</td><td>fora por princípio: aprovar = registrar + exportar</td></tr>
+    <tr><td>Login real + RBAC</td><td>headers são stub</td></tr>
+    <tr><td><s><code>policy_kinds</code> por tenant</s></td><td><b>feito (Task 9 / 0013)</b></td></tr>
+    <tr><td>Rename de <code>capacity_t_month</code>/<code>cost_per_ton</code></td><td>W0.2</td></tr>
+    <tr><td>FK de <code>supplier_contracts.sku_ids[]</code></td><td>array sem FK; validação na API</td></tr>
+    <tr><td>Identidade para políticas, rotas, contratos…</td><td>só nós/SKUs são alvo de FK hoje</td></tr>
+    <tr><td>Estoque no solver, multi-período, multi-escalão</td><td>A4 piloto: 1 período, 1 escalão</td></tr>
+    <tr><td>Gurobi/CPLEX, segredos no banco</td><td>proibidos pelo gate e pelas guidelines</td></tr>
+  </table>
+</section>
+
+<footer>Gerado a partir de <code>contracts/v0-postgres-cadastro.sql</code> + <code>db/migrations/0002–0018</code> (sync 31/10/2026 ~17:20 America/Sao_Paulo). Diagramas: Mermaid (CDN). Tipos <code>text_arr</code>/<code>uuid_arr</code> = <code>text[]</code>/<code>uuid[]</code> (o Mermaid não aceita colchetes).</footer>
+</div>
+</main>
+<script>
+// ===== MODELO (fonte: contracts/v0-postgres-cadastro.sql + db/migrations 0002–0018) =====
+// col: [nome, tipo, flags, nota]  flags: P=PK, F=FK, U=parte de UNIQUE, T=tenant_id
+const E = {
+  tenants: { dom:"multi", title:"Clientes (tenants)", mig:"0001",
+    purpose:"Um registro por empresa cliente. Toda linha de negócio aponta pra cá via tenant_id.",
+    app:"SELECT (0004)", rls:"RLS por id = app_tenant_id() · FORCE (0002)",
+    cols:[["id","uuid","P","id do cliente"],["slug","text","U","apelido único"],["name","text","",""],["created_at","timestamptz","",""]]},
+  users: { dom:"multi", title:"Usuários", mig:"0001",
+    purpose:"Pessoas do cliente. E-mail único por tenant; papel define a perna do IBP. Hoje o app só lê.",
+    app:"SELECT (0004)", rls:"RLS + FORCE (0002)",
+    cols:[["id","uuid","P",""],["tenant_id","uuid","FT","→ tenants"],["email","text","U","único por tenant"],["display_name","text","",""],["role","text","","domain_owner|sales|supply|finance|admin"],["created_at","timestamptz","",""]]},
+  audit_log: { dom:"multi", title:"Trilha de auditoria", mig:"0001",
+    purpose:"Append-only: toda escrita (criar, editar, aposentar, ingerir) grava quem, o quê, em qual entidade e o porquê.",
+    app:"SELECT, INSERT — sem UPDATE/DELETE (0004)", rls:"RLS + FORCE (0002)",
+    cols:[["id","bigserial","P",""],["tenant_id","uuid","FT","→ tenants"],["at","timestamptz","",""],["actor_user_id","uuid","","sem FK (texto do header)"],["actor_role","text","",""],["action","text","","texto livre: create|update|retire|delete|ingest|ditado|approve|escalate|void|export"],["entity","text","",""],["entity_id","text","",""],["payload","jsonb","","inclui o why"]]},
+  tenant_settings: { dom:"settings", title:"Configuração do cliente", mig:"0003 · 0008 · 0010 · 0013",
+    purpose:"Uma linha por cliente: moeda, unidade, tipos de nó, rótulos de KPI, escopo de supply externo e o “cadastro confirmado”.",
+    app:"SELECT, INSERT, UPDATE (0004)", rls:"RLS + FORCE (0003)",
+    cols:[["tenant_id","uuid","PFT","PK = FK → tenants (1:1)"],["currency","text","","ISO 4217; null = não definida"],["uom","text","","unidade padrão"],["node_types","text_arr","","vazio = qualquer texto"],["kpi_labels","jsonb","","chave → rótulo"],["updated_at","timestamptz","",""],["supply_external_in_scope","boolean","","0008 · default false"],["confirmed_at","timestamptz","","0010 · null = não confirmado"],["industry_pack","text","","0013 · NULL ≡ generic"],["entity_labels","jsonb","","0013 · objeto"],["policy_kinds","jsonb","","0013 · aliases de kind; chave alcada"],["agent_roster","jsonb","","0013 · A1–A7 exibição"]]},
+  policies: { dom:"cadastro", title:"Políticas", mig:"0001 · 0005 · 0006", versioned:true,
+    purpose:"Regras do negócio: estoque, capital de giro, nível de serviço, alçadas, pesos do A4. Conteúdo no JSON body.",
+    app:"SELECT, INSERT, UPDATE (0004)", rls:"RLS + FORCE (0002)",
+    cols:[["id","uuid","P","id da versão"],["tenant_id","uuid","FT","→ tenants"],["stable_id","uuid","U","0006 · id do objeto no tempo"],["kind","text","U","texto livre desde 0005"],["name","text","U",""],["version","int","U",""],["is_current","boolean","","1 corrente por stable_id"],["body","jsonb","","cobertura, OTIF, DSI, alçadas, pesos"],["created_by","uuid","F","→ users"],["created_at","timestamptz","",""]]},
+  nodes_identity: { dom:"cadastro", title:"Identidade de nó", mig:"0006",
+    purpose:"Uma linha por nó “no tempo” (stable_id). É o alvo das FKs: capacidade, rotas, vendas e cartões Gap apontam pra cá. Preenchida por trigger.",
+    app:"SELECT, INSERT (0006)", rls:"RLS + FORCE (0006)",
+    cols:[["tenant_id","uuid","PFT","→ tenants"],["stable_id","uuid","P","PK composta (tenant_id, stable_id)"],["created_at","timestamptz","",""]]},
+  nodes: { dom:"cadastro", title:"Nós da rede", mig:"0001 · 0005 · 0006", versioned:true,
+    purpose:"Filiais, CDs, plantas… Cada edição vira nova versão com o mesmo stable_id.",
+    app:"SELECT, INSERT, UPDATE (0004)", rls:"RLS + FORCE (0002)",
+    cols:[["id","uuid","P","id da versão"],["tenant_id","uuid","FT","→ tenants"],["stable_id","uuid","FU","→ nodes_identity (composta)"],["code","text","U","ex.: FL-CPS"],["name","text","",""],["node_type","text","","livre; validado vs tenant_settings"],["version","int","U",""],["is_current","boolean","",""],["attrs","jsonb","","geo, calendário"],["created_at","timestamptz","",""]]},
+  node_capacity: { dom:"cadastro", title:"Capacidade do nó", mig:"0001 · 0006", versioned:true,
+    purpose:"Capacidade separada do nó, com versão própria. É daqui (e não do nó) que a prontidão do A4 lê capacidade.",
+    app:"SELECT, INSERT, UPDATE (0004)", rls:"RLS + FORCE (0002)",
+    cols:[["id","uuid","P",""],["tenant_id","uuid","FT","→ tenants"],["stable_id","uuid","U","0006"],["node_id","uuid","F","stable_id do nó → nodes_identity"],["version","int","",""],["is_current","boolean","",""],["capacity_t_month","numeric","","API: capacity_per_period"],["capacity_extra","numeric","",""],["calendar","jsonb","","indisponibilidades"],["created_at","timestamptz","",""]]},
+  routes: { dom:"cadastro", title:"Rotas", mig:"0001 · 0006", versioned:true,
+    purpose:"Ligação logística entre dois nós: modal, lead time, custo, janelas de entrega.",
+    app:"SELECT, INSERT, UPDATE (0004)", rls:"RLS + FORCE (0002)",
+    cols:[["id","uuid","P",""],["tenant_id","uuid","FT","→ tenants"],["stable_id","uuid","U","0006"],["code","text","U","ex.: R-14"],["origin_node_id","uuid","F","→ nodes_identity"],["dest_node_id","uuid","F","→ nodes_identity"],["mode","text","",""],["version","int","U",""],["is_current","boolean","",""],["lead_time_days","numeric","",""],["cost_per_ton","numeric","","API: cost_per_unit"],["windows","jsonb","","janelas de entrega"],["created_at","timestamptz","",""]]},
+  skus_identity: { dom:"cadastro", title:"Identidade de SKU", mig:"0006",
+    purpose:"Uma linha por SKU no tempo (stable_id). Alvo das FKs de vendas.",
+    app:"SELECT, INSERT (0006)", rls:"RLS + FORCE (0006)",
+    cols:[["tenant_id","uuid","PFT","→ tenants"],["stable_id","uuid","P","PK composta"],["created_at","timestamptz","",""]]},
+  skus: { dom:"cadastro", title:"Produtos (SKUs)", mig:"0001 · 0006", versioned:true,
+    purpose:"Catálogo de produtos com família e custo unitário.",
+    app:"SELECT, INSERT, UPDATE (0004)", rls:"RLS + FORCE (0002)",
+    cols:[["id","uuid","P",""],["tenant_id","uuid","FT","→ tenants"],["stable_id","uuid","FU","→ skus_identity (composta)"],["code","text","U",""],["name","text","",""],["family","text","",""],["version","int","U",""],["is_current","boolean","",""],["unit_cost","numeric","",""],["attrs","jsonb","",""],["created_at","timestamptz","",""]]},
+  supplier_contracts: { dom:"cadastro", title:"Contratos de fornecedor", mig:"0001 · 0006", versioned:true,
+    purpose:"Obrigações com fornecedores (volume mín./máx., take-or-pay, janelas, penalidades). Só exigido na prontidão se supply externo estiver no escopo.",
+    app:"SELECT, INSERT, UPDATE (0004)", rls:"RLS + FORCE (0002)",
+    cols:[["id","uuid","P",""],["tenant_id","uuid","FT","→ tenants"],["stable_id","uuid","U","0006"],["code","text","U",""],["supplier_group","text","",""],["version","int","U",""],["is_current","boolean","",""],["obligations","jsonb","","volume, take-or-pay, penalidades"],["sku_ids","uuid_arr","","stable_ids de SKU — SEM FK (só API)"],["valid_from","date","",""],["valid_to","date","",""],["created_at","timestamptz","",""]]},
+  sales_history: { dom:"cadastro", title:"Histórico de vendas", mig:"0001 · 0006 · 0018",
+    purpose:"Vendas importadas (ingestão). Não é versionado.",
+    app:"SELECT, INSERT, DELETE (0004)", rls:"RLS + FORCE (0002)",
+    cols:[["id","uuid","P",""],["tenant_id","uuid","FT","→ tenants"],["node_id","uuid","F","→ nodes_identity"],["sku_id","uuid","F","→ skus_identity"],["period","text","","só YYYY-MM (CHECK + zod ym, 0018) · UNIQUE (tenant,node,sku,period,source)"],["qty","numeric","","CHECK qty >= 0 (0018)"],["revenue","numeric","",""],["source","text","","default extract"],["ingested_at","timestamptz","",""]]},
+  finance_drivers: { dom:"cadastro", title:"Drivers financeiros", mig:"0001 · 0006", versioned:true,
+    purpose:"Mapa de como volume, preço, prazo e investimento viram caixa, margem e DIO.",
+    app:"SELECT, INSERT, UPDATE (0004)", rls:"RLS + FORCE (0002)",
+    cols:[["id","uuid","P",""],["tenant_id","uuid","FT","→ tenants"],["stable_id","uuid","U","0006"],["version","int","",""],["is_current","boolean","",""],["mapping","jsonb","",""],["created_at","timestamptz","",""]]},
+  scenarios: { dom:"runtime", title:"Cenários", mig:"0001 · 0007 · 0009 · 0011", versioned:true,
+    purpose:"Um cenário de planejamento (ex.: SCN-0142), versionado. Criação pela API entra na Task 6 (grant de escrita na 0011).",
+    app:"SELECT (0009) · INSERT, UPDATE (0011, Task 6)", rls:"RLS + FORCE (0009)",
+    cols:[["id","uuid","PU","UNIQUE (tenant_id, id) na 0007"],["tenant_id","uuid","FTU","→ tenants"],["code","text","U","ex.: SCN-0142"],["name","text","",""],["version","int","U",""],["is_current","boolean","",""],["leg","text","","sales|supply|finance|composed"],["status","text","","draft|ready|stale|archived"],["created_by","uuid","F","→ users"],["created_at","timestamptz","",""]]},
+  premise_cards: { dom:"runtime", title:"Cartões de premissa", mig:"0001 · 0007",
+    purpose:"Premissas tipadas do cenário (NovaFilial, CurvaDemanda, Investimento, Gap). Gap precisa apontar para um nó corrente (stable_id).",
+    app:"SELECT, INSERT, UPDATE (0007)", rls:"RLS + FORCE (0007)",
+    cols:[["id","uuid","P",""],["tenant_id","uuid","FT","→ tenants"],["scenario_id","uuid","F","→ scenarios (tenant_id, id)"],["card_id","text","","ex.: PC-0142-04"],["type","text","","NovaFilial|CurvaDemanda|Investimento|Gap"],["fields","jsonb","",""],["status","text","","ok|gap"],["node_id","uuid","F","stable_id → nodes_identity; obrigatório se Gap"],["version","int","",""],["source","text","","ditado|edit"],["created_at","timestamptz","",""]]},
+  a4_runs: { dom:"runtime", title:"Execuções do A4", mig:"0001 · 0009 · 0012",
+    purpose:"Cada rodada do otimizador A4 (CBC, sem LLM) sobre uma versão do cenário: status, top 3 razões, contagem por tipo e plano resumido. 0012: UNIQUE (tenant_id, id, scenario_id) — alvo das FKs de decision_events e execution_movements. plan cru = conteúdo do export W7.",
+    app:"SELECT, INSERT, UPDATE (0009)", rls:"RLS + FORCE (0009)",
+    cols:[["id","uuid","P",""],["tenant_id","uuid","FTU","→ tenants"],["run_code","text","U","único por tenant"],["scenario_id","uuid","F","→ scenarios (tenant_id, id)"],["scenario_version","int","","foto da versão usada"],["status","text","","queued|running|feasible|partial|discarded|failed"],["reasons","jsonb","","até 3: janela|capacidade|contrato|custo|outro"],["counts_by_kind","jsonb","",""],["plan","jsonb","","plano resumido"],["started_at","timestamptz","",""],["finished_at","timestamptz","",""],["error","text","","0009 · erro curto"]]},
+  decision_events: { dom:"runtime", title:"Decisões (aprovar / escalar)", mig:"0001 · 0012",
+    purpose:"Registro de aprovar ou escalar um cenário, com porquê obrigatório. Sem write-back no ERP. Task 7: API + 0012.",
+    app:"SELECT+INSERT (0012, append-only)", rls:"FORCE RLS (0012)",
+    cols:[["id","uuid","P",""],["tenant_id","uuid","FT","→ tenants"],["scenario_id","uuid","F","→ scenarios"],["scenario_version","int","",""],["run_id","uuid","F","→ a4_runs (opcional)"],["action","text","","approve|escalate"],["why","text","","não vazio"],["actor_user_id","uuid","F","→ users"],["actor_role","text","","CHECK 0012: domain_owner|sales|supply|finance|system"],["export_ref","text","","sempre null V0 (W7 não preenche)"],["at","timestamptz","",""]]},
+  execution_movements: { dom:"runtime", title:"Movimentos de execução", mig:"0014",
+    purpose:"Movimento programado/realizado (bucket = dia) ligado a um plano (run A4 do mesmo cenário). Base do Pulse programado vs plano. Append-only: só posted → void.",
+    app:"SELECT, INSERT + UPDATE(status) só void (0014)", rls:"RLS + FORCE (0014)",
+    cols:[["id","uuid","PU",""],["tenant_id","uuid","FTU","→ tenants"],["plan_run_id","uuid","F","(tenant_id, plan_run_id, scenario_id) → a4_runs"],["scenario_id","uuid","F","idem (run do mesmo cenário)"],["scenario_version","int","",""],["period_start","date","","bucket = dia"],["kind","text","","ship|receive|produce|transfer|other"],["node_id","uuid","F","stable_id → nodes_identity (opcional)"],["sku_id","uuid","F","stable_id → skus_identity (opcional)"],["qty_planned","numeric","","≥ 0 ou null"],["qty_actual","numeric","","≥ 0"],["uom","text","",""],["status","text","","posted|void (trigger void-only)"],["source","text","","api|seed|import"],["note","text","",""],["at","timestamptz","",""],["actor_user_id","uuid","F","→ users"],["actor_role","text","","sem CHECK"]]},
+  journey_runs: { dom:"runtime", title:"Journeys D3", mig:"0015 · 0016 · 0017",
+    purpose:"Learning journey (leverage → consensus → roles → conviction → land) no tenant lab. Land cria (thin) ou liga um tenant via funções SECURITY DEFINER.",
+    app:"SELECT, INSERT, UPDATE — sem DELETE (0015)", rls:"RLS + FORCE (0015)",
+    cols:[["id","uuid","PU","UNIQUE (tenant_id, id)"],["tenant_id","uuid","FTU","→ tenants (lab)"],["code","text","U","único por tenant"],["status","text","","open|conviction|landed|abandoned"],["sponsor_role","text","","sem CHECK"],["scope","jsonb","","registrado; sem filtro V0"],["steps","jsonb","","[{id,status,at,notes}] · ordem forçada W6"],["leverage","jsonb","","snapshot; null + nullReason"],["conviction_ref","text","","path do pack JSON+MD"],["land_tenant_id","uuid","F","→ tenants (FK simples)"],["created_at","timestamptz","",""],["updated_at","timestamptz","","gravado pelo app"]]},
+};
+// relações: [pai, card, filho, rótulo, tipo]  tipo: t=tenant, f=FK, l=lógica (sem FK)
+const R = [
+  ["tenants","||--o|","tenant_settings","config 1:1","f"],
+  ...["users","audit_log","policies","nodes_identity","nodes","node_capacity","routes","skus_identity","skus","supplier_contracts","sales_history","finance_drivers","scenarios","premise_cards","a4_runs","decision_events","execution_movements","journey_runs"].map(c=>["tenants","||--o{",c,"tenant_id","t"]),
+  ["nodes_identity","||--|{","nodes","versões","f"],
+  ["skus_identity","||--|{","skus","versões","f"],
+  ["nodes_identity","||--o{","node_capacity","capacidade","f"],
+  ["nodes_identity","||--o{","routes","origem","f"],
+  ["nodes_identity","||--o{","routes","destino","f"],
+  ["nodes_identity","||--o{","sales_history","vendas","f"],
+  ["skus_identity","||--o{","sales_history","vendas","f"],
+  ["skus_identity","}o..o{","supplier_contracts","sku_ids sem FK","l"],
+  ["users","|o--o{","policies","created_by","f"],
+  ["users","|o--o{","scenarios","created_by","f"],
+  ["users","|o--o{","decision_events","ator","f"],
+  ["scenarios","||--o{","premise_cards","premissas","f"],
+  ["nodes_identity","|o--o{","premise_cards","Gap → nó","f"],
+  ["scenarios","||--o{","a4_runs","execuções","f"],
+  ["scenarios","||--o{","decision_events","decisões","f","FK composta por tenant (0012)"],
+  ["a4_runs","|o--o{","decision_events","run opcional","f","FK composta por tenant (0012)"],
+  ["users","|o--o{","execution_movements","ator","f"],
+  ["a4_runs","||--o{","execution_movements","plano (mesmo cenário)","f","FK composta por tenant (0014)"],
+  ["nodes_identity","|o--o{","execution_movements","nó opcional","f"],
+  ["skus_identity","|o--o{","execution_movements","sku opcional","f"],
+  ["tenants","|o--o{","journey_runs","land_tenant_id","f","FK simples (cross-ref por design)"],
+];
+const DIAG = {
+  geral:   { ents:Object.keys(E) },
+  multi:   { ents:["tenants","tenant_settings","users","audit_log","nodes_identity","skus_identity"], forceTenRel:true, forceTenant:true },
+  cadastro:{ ents:["users","policies","nodes_identity","nodes","node_capacity","routes","skus_identity","skus","supplier_contracts","sales_history","finance_drivers"] },
+  settings:{ ents:["tenants","tenant_settings"], forceTenRel:true, forceTenant:true },
+  runtime: { ents:["users","nodes_identity","skus_identity","scenarios","premise_cards","a4_runs","decision_events","execution_movements","journey_runs"] },
+};
+const UNLOCK = `flowchart LR
+  A["tenant_settings.confirmed_at"] --> C{"confirmed_at IS NOT NULL ?"}
+  P["Política corrente<br/>(capital de giro OU estoque+serviço)"] --> S
+  K["node_capacity corrente > 0"] --> S
+  RT["Rota corrente"] --> S
+  CT["Contrato corrente<br/>(só se supply_external_in_scope)"] -.-> S
+  G["Gap aberto / nó sem capacidade"] -.->|vira warn| S
+  S["GET /api/a4-readiness<br/>state = ok | warn | block"] --> D{"state ≠ block ?"}
+  C -->|sim| D
+  D -->|sim| U["unlock.new_scenario = true<br/>CTA Novo cenário liberado"]
+  C -->|não| L["Travado<br/>403 scenario_locked (Task 6)"]
+  D -->|não| L2["Travado<br/>409 a4_not_ready"]
+  classDef ok fill:#e3f7ee,stroke:#2e9e6e,color:#063;
+  classDef bad fill:#fde8e8,stroke:#c44,color:#600;
+  class U ok; class L,L2 bad;`;
+
+const st = { pk:true, fk:true, other:true, tenant:false, rel:true, tenRel:false, cmt:false };
+const KEY = { P:"PK", F:"FK", U:"UK" };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function colVisible(f, force){
+  const P=f.includes("P"), F=f.includes("F"), T=f.includes("T");
+  if (T && !st.tenant && !force) return false;
+  return (P && st.pk) || (F && st.fk) || (!P && !F && st.other);
+}
+function buildER(key){
+  const d = DIAG[key], set = new Set(d.ents), out = ["erDiagram"];
+  const rels = R.filter(r => set.has(r[0]) && set.has(r[2]) && st.rel && (r[4] !== "t" || st.tenRel || d.forceTenRel));
+  const inRel = new Set(rels.flatMap(r => [r[0], r[2]]));
+  for (const r of rels) out.push(`  ${r[0]} ${r[1]} ${r[2]} : "${r[3]}"`);
+  for (const n of d.ents){
+    const cols = E[n].cols.filter(c => colVisible(c[2], d.forceTenant));
+    if (!cols.length){ if (!inRel.has(n)) out.push(`  ${n}`); continue; }
+    out.push(`  ${n} {`);
+    for (const [c,t,f,note] of cols){
+      const keys = [...f].filter(x => KEY[x]).map(x => KEY[x]).join(", ");
+      const cm = st.cmt && note ? ` "${note.replace(/"/g,"'")}"` : "";
+      out.push(`    ${t} ${c}${keys ? " " + keys : ""}${cm}`);
+    }
+    out.push("  }");
+  }
+  return out.join("\n");
+}
+
+let seq = 0;
+async function renderBox(box){
+  const key = box.dataset.diagram;
+  const src = key === "unlock" ? UNLOCK : buildER(key);
+  const vp = box.querySelector(".vp"), pre = box.querySelector("pre");
+  pre.textContent = src;
+  try {
+    const { svg, bindFunctions } = await mermaid.render("m" + key + (seq++), src);
+    vp.innerHTML = svg; bindFunctions && bindFunctions(vp);
+    const s = vp.querySelector("svg"); s.style.maxWidth = "none";
+    box._w = s.viewBox.baseVal.width || s.getBBox().width; applyZoom(box);
+    hookClicks(vp); box.dataset.ok = "1";
+  } catch(e){ vp.innerHTML = `<div class="err">Erro ao renderizar Mermaid:\n${esc(e.message||e)}</div>`; box.dataset.ok = "0"; }
+}
+function applyZoom(box){
+  const s = box.querySelector(".vp svg"); if (!s) return;
+  const z = box._z || 1, base = Math.min(box._w || 800, box.querySelector(".vp").clientWidth - 28 || 800);
+  s.setAttribute("width", Math.round(base * z)); s.removeAttribute("height"); s.style.height = "auto";
+}
+function hookClicks(vp){
+  const names = Object.keys(E).sort((a,b) => b.length - a.length);
+  vp.querySelectorAll("g[id]").forEach(g => {
+    const n = names.find(x => g.id.includes("entity-" + x + "-") || g.id === "entity-" + x || g.id.endsWith("-" + x));
+    if (!n || !g.id.includes("entity")) return;
+    g.style.cursor = "pointer";
+    g.addEventListener("click", ev => { ev.stopPropagation(); goCard(n); });
+  });
+}
+function goCard(n){
+  const c = document.getElementById("e-" + n); if (!c) return;
+  c.open = true; c.scrollIntoView({ behavior:"smooth", block:"start" });
+  c.classList.add("flash"); setTimeout(() => c.classList.remove("flash"), 1400);
+}
+function renderAll(){ document.querySelectorAll(".diagram").forEach(renderBox); }
+
+function setupDiagrams(){
+  document.querySelectorAll(".diagram").forEach(box => {
+    box._z = 1;
+    box.innerHTML = `<div class="tools"><button class="btn" data-z="-">−</button><button class="btn" data-z="0">100%</button><button class="btn" data-z="+">+</button><button class="btn" data-full>⤢ tela cheia</button></div>
+      <div class="vp"></div><details><summary>ver código Mermaid</summary><pre></pre></details>`;
+    box.querySelector(".tools").addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      if (b.hasAttribute("data-full")){ box.classList.toggle("full"); b.textContent = box.classList.contains("full") ? "✕ fechar" : "⤢ tela cheia"; applyZoom(box); return; }
+      box._z = b.dataset.z === "0" ? 1 : Math.max(.3, Math.min(4, box._z * (b.dataset.z === "+" ? 1.25 : .8)));
+      applyZoom(box);
+    });
+  });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") document.querySelectorAll(".diagram.full").forEach(b => b.querySelector("[data-full]").click()); });
+}
+
+function cardHTML(n){
+  const e = E[n];
+  const rows = e.cols.map(([c,t,f,note]) => {
+    const P=f.includes("P"),F=f.includes("F"),T=f.includes("T");
+    const cls = [P?"colP":"",F?"colF":"",(!P&&!F)?"colO":"",T?"colT":""].join(" ");
+    const ks = [...f].filter(x => KEY[x]).map(x => `<span class="k ${x}">${KEY[x]}</span>`).join("");
+    return `<tr class="${cls}"><td class="c">${ks}${esc(c)}</td><td class="t">${esc(t.replace("_arr","[]"))}</td><td>${esc(note)}</td></tr>`;
+  }).join("");
+  return `<details class="card" id="e-${n}" data-search="${esc((n+" "+e.title+" "+e.purpose+" "+e.cols.map(c=>c[0]).join(" ")).toLowerCase())}">
+    <summary><span class="nm">${n}</span><span class="tt">${esc(e.title)}</span>
+      <p class="pp">${esc(e.purpose)}</p>
+      <div class="meta"><span class="pill">migr. ${esc(e.mig)}</span>${e.versioned?'<span class="pill v">versionada</span>':""}<span class="pill">app: ${esc(e.app)}</span><span class="pill">${esc(e.rls)}</span><span class="pill">${e.cols.length} colunas · clique p/ ver</span></div>
+    </summary>
+    <div class="body"><table><tr><th>coluna</th><th>tipo</th><th>nota</th></tr>${rows}</table></div></details>`;
+}
+function setupCards(){
+  document.querySelectorAll(".cards[data-dom]").forEach(box => {
+    box.innerHTML = Object.keys(E).filter(n => E[n].dom === box.dataset.dom).map(cardHTML).join("");
+  });
+  document.querySelectorAll("nav .ents").forEach(box => {
+    box.innerHTML = Object.keys(E).filter(n => E[n].dom === box.dataset.dom).map(n => `<a href="#e-${n}" data-card="${n}">${n}</a>`).join("");
+  });
+  document.querySelector("nav").addEventListener("click", e => { const a = e.target.closest("a[data-card]"); if (a){ e.preventDefault(); goCard(a.dataset.card); } });
+  const km = document.getElementById("keymap");
+  km.insertAdjacentHTML("beforeend", `<tr><td>todas as tabelas de negócio <code>.tenant_id</code></td><td><code>tenants.id</code></td><td>FK simples + RLS</td></tr>`);
+  const FKTXT = { "nodes|nodes_identity":"(tenant_id, stable_id)", "skus|skus_identity":"(tenant_id, stable_id)" };
+  for (const [p,,c,l,t,ov] of R){ if (t === "t") continue;
+    const kind = ov ? ov : t === "l" ? "<b>sem FK</b> (só API)" : (["nodes_identity","skus_identity"].includes(p) || (p==="scenarios" && c!=="decision_events")) ? "FK composta por tenant" : (p==="tenants" ? "PK = FK (1:1)" : "FK simples");
+    km.insertAdjacentHTML("beforeend", `<tr><td><code>${c}</code> <span class="muted">(${esc(l)})</span></td><td><code>${p}</code></td><td>${kind}</td></tr>`);
+  }
+}
+
+function syncBody(){
+  const b = document.body.classList;
+  b.toggle("hidePK", !st.pk); b.toggle("hideFK", !st.fk); b.toggle("hideOther", !st.other); b.toggle("hideTenant", !st.tenant);
+  for (const [id,k] of [["tPK","pk"],["tFK","fk"],["tOther","other"],["tTenant","tenant"],["tRel","rel"],["tTenRel","tenRel"],["tCmt","cmt"]]) document.getElementById(id).checked = st[k];
+}
+function setupToolbar(){
+  for (const [id,k] of [["tPK","pk"],["tFK","fk"],["tOther","other"],["tTenant","tenant"],["tRel","rel"],["tTenRel","tenRel"],["tCmt","cmt"]])
+    document.getElementById(id).addEventListener("change", e => { st[k] = e.target.checked; syncBody(); renderAll(); });
+  document.querySelectorAll("[data-preset]").forEach(b => b.addEventListener("click", () => {
+    const p = b.dataset.preset;
+    Object.assign(st, p === "clean" ? {pk:false,fk:false,other:false,rel:true} : p === "keys" ? {pk:true,fk:true,other:false,rel:true} : {pk:true,fk:true,other:true,tenant:true,rel:true,tenRel:true});
+    syncBody(); renderAll();
+  }));
+  document.getElementById("q").addEventListener("input", e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll(".card").forEach(c => { const hit = !q || c.dataset.search.includes(q); c.style.display = hit ? "" : "none"; if (q && hit) c.open = true; });
+    document.querySelectorAll("nav .ents a").forEach(a => { a.style.display = !q || document.getElementById("e-"+a.dataset.card).style.display !== "none" ? "" : "none"; });
+  });
+  document.querySelectorAll("section").forEach(sec => io.observe(sec));
+}
+let io;
+window.addEventListener("DOMContentLoaded", () => {
+  const links = [...document.querySelectorAll("nav > a")];
+  io = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) links.forEach(a => a.classList.toggle("on", a.getAttribute("href") === "#" + en.target.id)); }), { rootMargin:"-30% 0px -60% 0px" });
+  setupCards(); setupDiagrams(); setupToolbar(); syncBody();
+  if (!window.mermaid){ document.querySelectorAll(".diagram .vp").forEach(v => v.innerHTML = '<div class="err">Não consegui carregar o Mermaid do CDN (sem internet?). Os cartões e tabelas abaixo continuam válidos; o código do diagrama está em “ver código Mermaid”.</div>'); document.querySelectorAll(".diagram").forEach(b => { const k=b.dataset.diagram; b.querySelector("pre").textContent = k==="unlock"?UNLOCK:buildER(k); }); return; }
+  mermaid.initialize({ startOnLoad:false, theme:"default", securityLevel:"loose", er:{ useMaxWidth:false, diagramPadding:16 }, flowchart:{ useMaxWidth:false } });
+  renderAll();
+});
+</script>
+</body></html>

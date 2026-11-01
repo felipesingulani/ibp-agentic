@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ibp-agentic.local/schemas/alcada-queue-item.schema.json",
+  "title": "AlcadaQueueItem",
+  "description": "W3 Task 8 (aprovado Deivid 2026-10-30). Projeção read-only da fila de alçada Finance: 1 item por (scenarioId, scenarioVersion) com investimento acima da alçada vigente (POL de alçada do tenant). Não é tabela: derivado de scenarios + premise_cards (Investimento) + policies + decision_events. Valores em milhões da moeda do tenant (tenant_settings.currency). Wire: shell v0.3.4 / wizard v0.2.3 (localStorage 'ibp.alcada.queue'; campo 'nome' do wire = 'name' aqui; 'source' do wire fica fora).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "scenarioId",
+    "scenarioVersion",
+    "name",
+    "impactMi",
+    "alcadaMi",
+    "policyRef",
+    "status",
+    "events",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Determinístico: AQ-<scenarioCode>-v<scenarioVersion> (estável entre leituras; não é PK de tabela)."
+    },
+    "scenarioId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenarioVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Nome do cenário (scenarios.name)."
+    },
+    "runId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Run A4 done da mesma scenarioVersion, se houver."
+    },
+    "impactMi": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Investimento avaliado (soma dos cartões Investimento correntes da versão), em mi. null = cenário tem cartão Investimento sem valor numérico legível → entra na fila (fail-closed), nunca é estimado."
+    },
+    "alcadaMi": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Limite efetivo na leitura (mi). active = body.limitMi; misconfigured = 0 (fail-closed ≡ sem limiar). Item só existe em mode misconfigured|active (no_policy → fila vazia)."
+    },
+    "policyRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "policies.stable_id (ex.: POL-04)."
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending_finance",
+        "approved_finance",
+        "escalated_owner",
+        "stale"
+      ],
+      "description": "Enum do wire v0.3.4/v0.2.3. pending_finance = sem decisão Finance nesta versão · approved_finance = DecisionEvent approve (actor.role=finance) · escalated_owner = DecisionEvent escalate (actor.role=finance) · stale = existe versão corrente mais nova do cenário."
+    },
+    "escalateTo": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "finance",
+        "domain_owner",
+        null
+      ],
+      "description": "Destino atual: finance enquanto pending_finance; domain_owner após escalate de Finance. Subconjunto de DecisionEvent.actor.role."
+    },
+    "events": {
+      "type": "array",
+      "description": "DecisionEvents da (scenarioId, scenarioVersion), ordem cronológica (ex.: sales escalate → finance approve|escalate).",
+      "items": {
+        "$ref": "decision-event.schema.json"
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Criação da scenarioVersion (ou 1º evento, o que vier antes)."
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Último evento ou última mudança da versão."
+    }
+  }
+}

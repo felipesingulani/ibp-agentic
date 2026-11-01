@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ibp-agentic.local/schemas/a4-run-summary.schema.json",
+  "title": "A4RunSummary",
+  "description": "V0 — always-on do run A4: top razões + countsByKind. Wire Didi v0.2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["runId", "scenarioId", "scenarioVersion", "reasons", "countsByKind"],
+  "properties": {
+    "runId": { "type": "string", "minLength": 1 },
+    "scenarioId": { "type": "string", "minLength": 1 },
+    "scenarioVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Versão do cenário no momento do run; se premissa mudar, sobe e invalida run anterior."
+    },
+    "reasons": {
+      "type": "array",
+      "maxItems": 3,
+      "items": { "$ref": "a4-reason.schema.json" }
+    },
+    "countsByKind": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["janela", "capacidade", "contrato", "custo", "outro"],
+      "properties": {
+        "janela": { "type": "integer", "minimum": 0 },
+        "capacidade": { "type": "integer", "minimum": 0 },
+        "contrato": { "type": "integer", "minimum": 0 },
+        "custo": { "type": "integer", "minimum": 0 },
+        "outro": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

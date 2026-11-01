@@ -1,0 +1,23 @@
+# IBP Agentic V0 — Postgres local (W0)
+# Uso: docker compose up -d
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ibp-v0-db
+    environment:
+      POSTGRES_USER: ibp
+      POSTGRES_PASSWORD: ibp_dev_only
+      POSTGRES_DB: ibp_v0
+    ports:
+      - "5432:5432"
+    volumes:
+      - ibp_pg:/var/lib/postgresql/data
+      - ./contracts/v0-postgres-cadastro.sql:/docker-entrypoint-initdb.d/01_cadastro.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ibp -d ibp_v0"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ibp_pg:

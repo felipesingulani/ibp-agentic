@@ -1,0 +1,872 @@
+<!--
+  Domain Rewire OS / IBP Agentic — Wire médio-fi do PRODUTO (shell)
+  Versão: v0.3.1 · 2026-10-30 · Autor: Didi (UX)
+  Base: spec 2026-10-29-ibp-agentic-domain-rewire-design.md — §5 (objetos de cadastro), §7.4 (cockpit/value board),
+        §7.5 (execution pulse), §11 (superfícies: Cadastro · Command center · Visões por perna).
+  Relação com v0.2: o happy path de 5 etapas (Ditado → Premissas → Cenário → A4 → Takeaways) NÃO é reescrito aqui.
+        Ele vira o wizard "Novo cenário" dentro de Cenários: link para
+        ./2026-10-30-ibp-agentic-ux-wire-happy-path-v0.2.html (mesmo diretório) + pré-visualização opcional em iframe.
+  Contratos: ./contracts/*.schema.json (PremiseCard, A4Reason, A4RunSummary, DecisionEvent). Severity = info|warn|block.
+
+  CHANGELOG
+  v0.3.1 (2026-10-30, review crítico PO + crítica Devi)
+    PO (1) Tenant config — gaveta "⚙ Config do tenant" (header e Cadastro): moeda-base BRL/USD/EUR (só formata,
+        sem câmbio), UoM default (un/kg/L/cx), capacidade (substantivo + unidade), tipos de nó editáveis (chips; alimentam
+        o select de Rede), aliases de KPI (serviço/WC/proxy WC/custo/violações — demo OTIF/DSI são aliases), supply externo
+        no escopo. Copy usa tokens {$} {un} {cap} {capun} {svc} {wcp} {wc} {cost} {viol} resolvidos em runtime — zero "R$"
+        hardwired. Preview tenant_config JSON (sugestão: tenants.config jsonb). Banner "Demo: vertical genérica · sample BR".
+    PO (3) Onboarding — header "Sample demo | Tenant vazio" (+ botões na Config). Vazio: cadastro 0%, todas as abas com
+        empty state + CTA "＋ Primeira política / Primeiro nó…", Pulse sem KPIs inventados (— + checklist + próximos passos),
+        Visões e Cenários vazios com próximo passo; sem Ribeirão/CDs. Default ao abrir = sample.
+    PO (4) Visões — ação tipada por lente: Sales "＋ Novo cenário de demanda" (→ #cenarios/novo, destaca o fluxo + prontidão);
+        Supply "Registrar gap de capacidade" (gaveta → PremiseCard type=Gap, links.nodeId obrigatório, aparece em
+        Cadastro · Rede, deixa stale cenários do nó); Finance "Fila de alçada" (cenários > alçada POL-04; aprovar/escalar com
+        porquê obrigatório → DecisionEvent; aprovar desabilitado se stale).
+    PO (5) Prontidão A4 — checklist explícito ok/falta/n/a: política WC (ou Estoque+Serviço), ≥1 nó publicado c/ capacidade,
+        ≥1 rota publicada, ≥1 contrato publicado SE supply externo no escopo (toggle). % = itens mínimos ok ÷ exigidos;
+        estado A4 bloqueado | pronto c/ restrições (gaps block) | pronto. No Cadastro, no Pulse (vazio) e em Novo cenário.
+    PO (2)/Devi — mock A4Reason.kind = "capacidade" (+ countsByKind); fallback normaliza "tancagem" legado (SCN-0151 mantém
+        payload legado de propósito, tag "legado normalizado"). Label UI = capacidade.
+    Devi — removido resíduo vertical: "Família C" puro, "Item C1", "Upside Família C", "BU demo".
+    Devi — nova aba Cadastro "Finance drivers" (§5.7): driver (volume/preço/prazo/investimento/custo) → caixa/margem/WC,
+        regra, fonte, granularidade; alinhada a finance_drivers.mapping (W0 SQL). Não entra no mínimo do A4.
+    A11y: progressbar com aria-valuenow/valuetext, foco no fluxo Novo cenário, textarea no focus trap, chips com
+        aria-label de remoção, banners/estado em texto (não só cor).
+  v0.3 (2026-10-30, feedback Felipe "faltando verdade" + direção PO)
+    - Shell do app: brand "Domain Rewire · IBP", usuário demo (Domain owner), nav lateral
+      Cadastro · Pulse/Caixa · Visões · Cenários, estado ativo (aria-current), roteamento por hash (#cadastro/politicas…).
+    - Cadastro (W0, §5) como módulo de 1ª classe: 6 abas — Políticas, Rede & capacidade, Logística,
+      Produtos & custos, Contratos de fornecedor, Histórico/âncoras. Políticas + Rede + Contratos com CRUD leve
+      completo (listar, filtrar, novo, editar em gaveta, publicar/rascunho, arquivar, histórico de versões com autor/porquê).
+      Demais abas também editáveis (mesmo motor), com menos campos. Objetos versionados (§5 "todos versionados").
+      Banner de prontidão: % do cadastro mínimo p/ o A4 rodar + gaps bloqueantes linkados.
+    - Pulse/Caixa (command center, §7.4/§7.5/§11.2): value board (WC/DSI proxy, OTIF, custo logístico, #violações)
+      com sparks, tendência de caixa 18m (barras CSS, horizonte semana→mês), pulse programado vs plano (exceções A6),
+      decisões pendentes de alçada (Finance >R$2mi), atalhos (Novo cenário, Revisar gaps, Ver Supply).
+    - Visões (§11.3): lente Sales | Supply | Finance no mesmo canvas; cards primários mudam + bloco
+      "contexto cruzado" sempre visível (não silo). Filtro BU/horizonte compartilhado entre lentes.
+    - Cenários: lista (Baseline, Abrir filial Y, Stress supply, Upside) com status otimizado|stale|draft|escalado,
+      detalhe em gaveta (A4RunSummary: top razões + countsByKind + scenarioVersion), CTA Novo cenário → v0.2.
+    - A11y: skip link, aria-current na nav, tabs com role=tablist e setas, gaveta role=dialog com foco preso,
+      Esc fecha e devolve foco, aria-live para toasts.
+    - Passe vertical-agnóstico (diretriz Felipe 00:39): copy/labels genéricos — Nó/CD, capacidade de armazenagem
+      (não "tancagem"), famílias/itens A/B/C, unidade "un", fornecedores Alfa/Beta/Gama/Delta, modos rodoviário/
+      intermodal/expresso. Nomes de cidades BR mantidos como demo. Enum de contrato A4Reason.kind ainda tem
+      "tancagem" (valor no dado); UI exibe "capacidade" via mapa KIND — sugerido renomear no schema.
+  v0.2 (2026-10-30) happy path polido (arquivo separado). v0.1 (2026-10-30) primeiro wire.
+
+  Notas: só UI wire — dados fictícios (placeholders de demo do PO: Ribeirão≈Campinas; CD1 Jundiaí, CD2 Contagem,
+  CD3 Uberlândia; OTIF≥95%, SS 18d, DSI≤45; alçada Finance >R$2mi). Sem backend, estado em memória. Zero deps.
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Domain Rewire · IBP — Wire shell (v0.3.1)</title>
+<style>
+  :root{--bg:#f5f6f8;--card:#fff;--ink:#1d2330;--mute:#5f6777;--line:#dfe2e8;--acc:#2f5bea;--acc2:#e9eefc;
+        --ok:#1f8a4c;--okbg:#e6f4ec;--gap:#c62828;--gapbg:#fdecec;--warn:#9a5b00;--warnbg:#fff4e0;
+        --info:#1f5fae;--infobg:#e8f1fb;--side:#141a28}
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.45 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+  :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+  .skip{position:absolute;left:-999px;top:0;background:#fff;padding:8px;z-index:100}.skip:focus{left:8px}
+  header.top{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:10px 20px;height:52px}
+  .brand{font-weight:700}.brand small{font-weight:400;color:var(--mute);margin-left:8px}
+  .ctx{margin-left:auto;display:flex;align-items:center;gap:12px;color:var(--mute);font-size:12px}
+  .avatar{width:28px;height:28px;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px}
+  .layout{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 52px)}
+  nav.side{background:var(--side);color:#c9d1e3;padding:14px 10px;position:sticky;top:52px;height:calc(100vh - 52px)}
+  nav.side a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:6px;color:#c9d1e3;text-decoration:none;margin-bottom:2px}
+  nav.side a:hover{background:#1f2738}
+  nav.side a[aria-current="page"]{background:var(--acc);color:#fff;font-weight:600}
+  nav.side .ico{width:18px;text-align:center}
+  nav.side .badge{margin-left:auto;background:var(--gap);color:#fff;border-radius:9px;font-size:11px;padding:0 6px}
+  nav.side .sep{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#7b859c;margin:16px 12px 6px}
+  nav.side .foot{position:absolute;bottom:12px;left:12px;right:12px;font-size:11px;color:#7b859c}
+  main{padding:22px 28px;max-width:1280px;width:100%}
+  section.area{display:none}section.area.active{display:block}
+  h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:0 0 10px}h3{font-size:13px;margin:0 0 8px}
+  .sub{color:var(--mute);margin:0 0 16px;max-width:860px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px}
+  .grid{display:grid;gap:14px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+  .g21{grid-template-columns:2fr 1fr}
+  @media (max-width:1000px){.g2,.g3,.g4,.g21{grid-template-columns:1fr}.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}nav.side .foot{position:static;margin-top:10px}}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.sp{flex:1}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:6px;padding:7px 12px;cursor:pointer;font:inherit;color:var(--ink);text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+  .btn:hover:not(:disabled){border-color:#b9bfcc}.btn.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+  .btn.danger{color:var(--gap)}.btn.sm{padding:4px 8px;font-size:12px}
+  .btn.ghost{border-color:transparent;background:none;color:var(--acc)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:10px;background:#eef0f4;color:#4a5263;border:1px solid var(--line);white-space:nowrap}
+  .tag.ok{background:var(--okbg);color:var(--ok);border-color:#bfe3cd}
+  .tag.gap,.tag.block{background:var(--gapbg);color:var(--gap);border-color:#f3c2c2}
+  .tag.warn{background:var(--warnbg);color:var(--warn);border-color:#f2d7a6}
+  .tag.info{background:var(--infobg);color:var(--info);border-color:#c7dcf3}
+  .tag.agent{background:var(--acc2);color:var(--acc);border-color:#cdd8fb}
+  .hint{font-size:12px;color:var(--mute)}
+  .alert{padding:10px 12px;border-radius:6px;font-size:13px;margin-bottom:14px}
+  .alert.gap{background:var(--gapbg);color:var(--gap);border:1px solid #f3c2c2}
+  .alert.ok{background:var(--okbg);color:var(--ok);border:1px solid #bfe3cd}
+  .alert.warn{background:var(--warnbg);color:var(--warn);border:1px solid #f2d7a6}
+  .alert.info{background:var(--infobg);color:var(--info);border:1px solid #c7dcf3}
+  .link{color:var(--acc);cursor:pointer;text-decoration:underline dotted;background:none;border:0;padding:0;font:inherit}
+  /* tabs */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:14px;flex-wrap:wrap}
+  .tabs [role=tab]{background:none;border:0;border-bottom:3px solid transparent;padding:9px 12px;cursor:pointer;font:inherit;color:var(--mute)}
+  .tabs [role=tab][aria-selected=true]{color:var(--ink);border-bottom-color:var(--acc);font-weight:600}
+  .tabs .cnt{font-size:11px;color:var(--mute);margin-left:4px}
+  /* table */
+  table{width:100%;border-collapse:collapse;background:#fff}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #eceef2;font-size:13px;vertical-align:top}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);font-weight:600;background:#fafbfc}
+  tr.clk{cursor:pointer}tr.clk:hover td{background:#f8f9ff}
+  tr.archived td{color:#9aa1ae;text-decoration:line-through}
+  .tblwrap{border:1px solid var(--line);border-radius:8px;overflow:auto}
+  input.f,select.f,textarea.f{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;background:#fff;width:100%}
+  input.f[aria-invalid=true]{border-color:var(--gap);background:#fffafa}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+  .seg button{border:0;background:none;padding:8px 16px;cursor:pointer;font:inherit;color:var(--mute)}
+  .seg button[aria-pressed=true]{background:var(--acc);color:#fff;font-weight:600}
+  /* KPI */
+  .kpi .lbl{font-size:12px;color:var(--mute)}.kpi .val{font-size:24px;font-weight:700;margin:2px 0}
+  .kpi .delta{font-size:12px}.up{color:var(--ok)}.dn{color:var(--gap)}
+  .spark{display:flex;align-items:flex-end;gap:2px;height:30px;margin-top:8px}
+  .spark i{flex:1;background:#cdd8fb;border-radius:2px 2px 0 0}.spark i:last-child{background:var(--acc)}
+  .bars{display:flex;align-items:flex-end;gap:4px;height:150px;padding-top:10px;border-bottom:1px solid var(--line)}
+  .bars .b{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;position:relative}
+  .bars .b i{width:100%;border-radius:3px 3px 0 0;background:#9fb3f5}
+  .bars .b i.plan{background:none;border:1px dashed var(--mute);position:absolute;bottom:0}
+  .bars .b i.neg{background:#f2a7a7}
+  .bars .lim{position:absolute;left:0;right:0;border-top:2px dashed var(--gap)}
+  .axis{display:flex;gap:4px;font-size:10px;color:var(--mute)}.axis span{flex:1;text-align:center}
+  .meter{height:8px;background:#eef0f4;border-radius:4px;overflow:hidden}.meter i{display:block;height:100%;background:var(--acc)}
+  ul.clean{list-style:none;margin:0;padding:0}
+  ul.clean li{padding:8px 0;border-bottom:1px dashed #eceef2;display:flex;gap:8px;align-items:flex-start}
+  ul.clean li:last-child{border-bottom:0}
+  .cross{border:1px dashed var(--acc);background:#fbfcff}
+  .cross h3::before{content:"↔ ";color:var(--acc)}
+  /* drawer */
+  .scrim{position:fixed;inset:0;background:rgba(15,20,32,.35);z-index:40;display:none}.scrim.show{display:block}
+  aside.drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100%);background:#fff;z-index:50;transform:translateX(100%);transition:transform .18s;box-shadow:-8px 0 24px rgba(0,0,0,.12);display:flex;flex-direction:column}
+  aside.drawer.show{transform:none}
+  aside.drawer header{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  aside.drawer .body{padding:16px 18px;overflow:auto;flex:1}
+  aside.drawer footer{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .fld{margin-bottom:12px}.fld label{display:block;font-size:12px;color:var(--mute);margin-bottom:4px}
+  .fld .err{color:var(--gap);font-size:12px;margin-top:3px}
+  .ver{font-size:12px;border-left:2px solid var(--line);padding:2px 0 8px 10px;margin-left:4px}
+  .ver.cur{border-left-color:var(--acc)}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1d2330;color:#fff;padding:9px 16px;border-radius:6px;font-size:13px;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast.show{opacity:1}
+  iframe.embed{width:100%;height:720px;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .empty{text-align:center;padding:30px;color:var(--mute)}
+  /* v0.3.1 */
+  header.top{height:auto;min-height:52px;flex-wrap:wrap}
+  .ctx{flex-wrap:wrap}
+  .ctx .seg button{padding:4px 10px;font-size:12px}
+  pre.json{background:#0f1420;color:#d6e2ff;padding:10px 12px;border-radius:6px;font-size:11.5px;overflow:auto;white-space:pre-wrap;margin:6px 0 0}
+  ul.checklist li .tag{min-width:52px;text-align:center}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+  .chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:14px;padding:2px 4px 2px 10px;background:#fafbfc;font-size:12px}
+  .chip button{border:0;background:none;cursor:pointer;color:var(--mute);font-size:13px;padding:0 4px;border-radius:50%}
+  .lensAct{display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-left:4px solid var(--acc);margin-bottom:14px}
+  .hl{outline:3px solid var(--acc);outline-offset:3px;transition:outline-color 1.2s}
+  .empty b{color:var(--ink)}.empty .btn{margin-top:10px}
+  fieldset.f{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0 0 12px}fieldset.f legend{font-size:12px;color:var(--mute);padding:0 4px}
+  .kv{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Pular para o conteúdo</a>
+<header class="top">
+  <div class="brand">Domain Rewire · IBP <small>wire v0.3.1 · shell do produto</small></div>
+  <span class="tag info" id="demoBanner" title="Sample de demonstração carregado — não é o ICP nem dado do cliente">Demo: vertical genérica · sample BR</span>
+  <span class="tag" id="emptyBanner" hidden>Tenant novo · vazio</span>
+  <div class="ctx">
+    <span>Tenant: <b id="ctxTenant">—</b> · <span id="ctxNet">—</span> · <span id="ctxCfg" title="Moeda · UoM do tenant (Config do tenant)">—</span></span>
+    <div class="seg" role="group" aria-label="Dados do tenant" id="dataSeg"><button data-ds="sample" aria-pressed="true">Sample demo</button><button data-ds="empty" aria-pressed="false">Tenant vazio</button></div>
+    <button class="btn sm" id="openCfg" aria-haspopup="dialog">⚙ Config do tenant</button>
+    <span class="tag agent" title="Orquestrador A7 ativo">A7 online</span>
+    <div class="avatar" aria-hidden="true">FD</div>
+    <span><b>Felipe (demo)</b><br>Domain owner</span>
+  </div>
+</header>
+<div class="layout">
+  <nav class="side" aria-label="Navegação principal">
+    <a href="#cadastro" data-area="cadastro"><span class="ico" aria-hidden="true">▤</span>Cadastro<span class="badge" id="navGap" title="gaps bloqueantes no cadastro"></span></a>
+    <a href="#pulse" data-area="pulse"><span class="ico" aria-hidden="true">◉</span>Pulse / Caixa</a>
+    <a href="#visoes" data-area="visoes"><span class="ico" aria-hidden="true">◐</span>Visões</a>
+    <a href="#cenarios" data-area="cenarios"><span class="ico" aria-hidden="true">⎇</span>Cenários</a>
+    <div class="sep">Atalhos</div>
+    <a href="2026-10-30-ibp-agentic-ux-wire-happy-path-v0.2.html"><span class="ico" aria-hidden="true">＋</span>Novo cenário (v0.2)</a>
+    <div class="foot">Dados fictícios de demo · sem backend<br>Contratos: ./contracts/<br>wire v0.3.1</div>
+  </nav>
+
+  <main id="main" tabindex="-1">
+    <!-- ============ CADASTRO ============ -->
+    <section class="area" id="area-cadastro" aria-labelledby="hCad">
+      <div class="row"><h1 id="hCad">Cadastro</h1><span class="tag">Foundation · W0 · §5</span></div>
+      <p class="sub">Verdade do domínio que alimenta A1–A4. Tudo versionado: cada publicação gera nova versão com autor e porquê, e cenários/runs referenciam a versão usada.</p>
+      <div class="card" style="margin-bottom:14px" id="readyCard" aria-labelledby="hReady">
+        <div class="row"><b id="hReady">Prontidão do cadastro para o A4</b><span class="tag" id="readyState"></span><span class="sp"></span><span id="readyPct" class="hint"></span>
+          <button class="btn sm" data-opencfg="1">⚙ Config do tenant</button></div>
+        <div class="meter" style="margin:8px 0" role="progressbar" aria-labelledby="hReady" id="readyMeter" aria-valuemin="0" aria-valuemax="100"><i id="readyBar"></i></div>
+        <div class="grid g21">
+          <div><h3 style="margin-top:6px">Mínimo para o A4 rodar <span class="hint">(contrato visual p/ eng)</span></h3><ul class="clean checklist" id="readyList"></ul></div>
+          <div><h3 style="margin-top:6px">Gaps em registros</h3><div id="readyGaps" class="hint"></div></div>
+        </div>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Objetos de cadastro" id="cadTabs"></div>
+      <div id="cadPanel" role="tabpanel"></div>
+    </section>
+
+    <!-- ============ PULSE / CAIXA ============ -->
+    <section class="area" id="area-pulse" aria-labelledby="hPulse">
+      <div class="row"><h1 id="hPulse">Pulse / Caixa</h1><span class="tag">Command center · §7.4 · §7.5</span><span class="sp"></span>
+        <span class="hint" id="planInfo">Plano vigente: <b>Baseline v7</b> · run A4 #R-0312 · atualizado há 2h</span></div>
+      <p class="sub">Uma tela integrada: caixa/WC, serviço, custo e violações de política, com o pulse de execução (programado vs. plano) e as decisões que esperam você.</p>
+      <div id="pulseEmpty" hidden></div>
+      <div id="pulseFull">
+      <div class="row" style="margin-bottom:14px">
+        <a class="btn primary" href="2026-10-30-ibp-agentic-ux-wire-happy-path-v0.2.html">＋ Novo cenário</a>
+        <a class="btn" href="#cadastro/rede" data-filter="gaps">Revisar gaps <span class="tag gap" id="pulseGapCnt"></span></a>
+        <a class="btn" href="#visoes/supply">Ver Supply</a>
+        <span class="sp"></span>
+        <label class="hint" for="horiz">Horizonte</label>
+        <select id="horiz" class="f" style="width:auto"><option value="18">18 meses</option><option value="6">6 meses</option><option value="3">13 semanas</option></select>
+      </div>
+      <div class="grid g4" id="kpis"></div>
+      <div class="grid g21" style="margin-top:14px">
+        <div class="card">
+          <div class="row" data-tpl="1"><h2>{wc} no horizonte ({$} mi)</h2><span class="sp"></span>
+            <span class="hint"><span style="display:inline-block;width:10px;height:10px;background:#9fb3f5"></span> plano otimizado
+            · <span style="display:inline-block;width:10px;height:0;border-top:2px dashed var(--gap)"></span> limite política WC</span></div>
+          <div class="bars" id="wcBars" role="img" aria-label="Barras de working capital por período"></div>
+          <div class="axis" id="wcAxis"></div>
+          <p class="hint" style="margin:8px 0 0">Granularidade: semana no curto, mês no longo (§8). Pico em M+7 = abertura Ribeirão (cenário em análise, não vigente). Valores na moeda-base do tenant (sem câmbio).</p>
+        </div>
+        <div class="card">
+          <h2>Decisões pendentes</h2>
+          <ul class="clean" id="pending"></ul>
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div class="row"><h2>Pulse de execução — programado vs. plano</h2><span class="tag agent">A6 alertas</span><span class="sp"></span>
+          <div class="seg" role="group" aria-label="Filtro de exceções" id="pulseSeg">
+            <button aria-pressed="true" data-f="all">Todas</button><button aria-pressed="false" data-f="block">Bloqueia</button><button aria-pressed="false" data-f="warn">Atenção</button>
+          </div></div>
+        <div class="tblwrap" style="margin-top:10px"><table>
+          <thead><tr><th>Movimento</th><th>Rota</th><th>Programado</th><th>Plano</th><th>Desvio</th><th>Severity</th><th>Ação sugerida (A5/A7)</th></tr></thead>
+          <tbody id="pulseRows"></tbody></table></div>
+      </div>
+      </div><!-- /pulseFull -->
+    </section>
+
+    <!-- ============ VISÕES ============ -->
+    <section class="area" id="area-visoes" aria-labelledby="hVis">
+      <div class="row"><h1 id="hVis">Visões</h1><span class="tag">Mesma verdade, lentes diferentes · §11.3</span></div>
+      <p class="sub">Cada time vê o seu primeiro, mas nunca em silo: o bloco “contexto cruzado” mostra o que de outra perna mexe na sua decisão.</p>
+      <div class="row" style="margin-bottom:14px">
+        <div class="seg" role="group" aria-label="Lente" id="lensSeg">
+          <button data-lens="sales" aria-pressed="false">Sales</button>
+          <button data-lens="supply" aria-pressed="false">Supply</button>
+          <button data-lens="finance" aria-pressed="false">Finance</button>
+        </div>
+        <span class="sp"></span>
+        <label class="hint" for="vNode">Nó</label>
+        <select id="vNode" class="f" style="width:auto"><option value="">Toda a rede</option></select>
+        <label class="hint" for="vFam">Família</label>
+        <select id="vFam" class="f" style="width:auto"><option value="">Todas</option><option>Família A</option><option>Família A2</option><option>Família B</option><option>Família C</option></select>
+      </div>
+      <div id="lensBody"></div>
+    </section>
+
+    <!-- ============ CENÁRIOS ============ -->
+    <section class="area" id="area-cenarios" aria-labelledby="hScn">
+      <div class="row"><h1 id="hScn">Cenários</h1><span class="tag">Scenario store · versionado</span><span class="sp"></span>
+        <a class="btn primary" href="2026-10-30-ibp-agentic-ux-wire-happy-path-v0.2.html" id="ctaNew">＋ Novo cenário</a></div>
+      <p class="sub">Cada cenário = premissas tipadas (A1–A3) sobre uma versão do cadastro + run do A4. “Stale” = o cadastro ou uma premissa mudou depois do último run. Máx. 3 no comparador do cockpit.</p>
+      <div class="alert info" id="newFlowBox" tabindex="-1">
+        <b>Fluxo “Novo cenário”</b> — o wizard de 5 etapas (Ditado → Premissas → Cenário → A4 → Takeaways/Cockpit) é o wire v0.2.
+        <div class="row" style="margin-top:8px">
+          <a class="btn primary sm" href="2026-10-30-ibp-agentic-ux-wire-happy-path-v0.2.html">Abrir fluxo Novo cenário</a>
+          <a class="btn sm" href="2026-10-30-ibp-agentic-ux-wire-happy-path-v0.2.html" target="_blank" rel="noopener">Abrir em nova aba</a>
+          <button class="btn sm" id="toggleEmbed" aria-expanded="false" aria-controls="embedWrap">Pré-visualizar embutido</button>
+          <span class="hint">Arquivo: ./2026-10-30-ibp-agentic-ux-wire-happy-path-v0.2.html (mesmo diretório)</span>
+        </div>
+        <div id="newFlowReady" style="margin-top:8px"></div>
+      </div>
+      <div id="embedWrap" hidden style="margin-bottom:14px">
+        <p class="hint">Se o navegador bloquear iframe em file://, use “Abrir em nova aba”.</p>
+        <iframe class="embed" title="Wizard Novo cenário (wire v0.2)" data-src="2026-10-30-ibp-agentic-ux-wire-happy-path-v0.2.html"></iframe>
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <div class="seg" role="group" aria-label="Filtro por status" id="scnSeg">
+          <button aria-pressed="true" data-f="">Todos</button><button aria-pressed="false" data-f="otimizado">Otimizado</button>
+          <button aria-pressed="false" data-f="stale">Stale</button><button aria-pressed="false" data-f="draft">Draft</button>
+        </div>
+        <span class="sp"></span><span class="hint" id="cmpHint">Selecione até 3 para comparar no cockpit</span>
+        <button class="btn sm" id="cmpBtn" disabled>Comparar no cockpit</button>
+      </div>
+      <div class="tblwrap"><table>
+        <thead data-tpl="1"><tr><th><span class="hint">Cmp</span></th><th>Cenário</th><th>Origem</th><th>Status</th><th>Cadastro</th><th>Δ {wc}</th><th>{svc}</th><th>{viol}</th><th>Atualizado</th></tr></thead>
+        <tbody id="scnRows"></tbody></table></div>
+    </section>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" aria-hidden="true">
+  <header><h2 id="drawerTitle" style="margin:0">—</h2><span class="sp"></span><button class="btn ghost" id="drawerClose" aria-label="Fechar (Esc)">✕</button></header>
+  <div class="body" id="drawerBody"></div>
+  <footer id="drawerFoot"></footer>
+</aside>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const toast=m=>{const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2200)};
+const today="30/10/2026";
+/* A4Reason.kind — mock v0.3.1 usa "capacidade". Fallback: payload legado "tancagem" é normalizado p/ "capacidade" (até o schema do Deivid trocar o enum). */
+const KIND={capacidade:"capacidade",janela:"janela",contrato:"contrato",custo:"custo",outro:"outro"};
+const normKind=k=>k==="tancagem"?"capacidade":k;
+function normCounts(c){const o={};for(const [k,v] of Object.entries(c||{})){const n=normKind(k);o[n]=(o[n]||0)+v;}return o;}
+
+/* ---------------- TENANT CONFIG (agnóstico de verdade) ----------------
+   Proposta de contrato p/ eng: tenants.config jsonb (ver JSON na gaveta Config do tenant).
+   Toda copy usa tokens {$} {un} {cap} {capun} {svc} {wcp} {wc} {cost} {viol}; a UI resolve a partir do TC.
+   Moeda = moeda-base do tenant: só formata, NÃO converte (sem câmbio na V0). */
+const CUR={BRL:{sym:"R$",name:"Real (BRL)"},USD:{sym:"US$",name:"Dólar americano (USD)"},EUR:{sym:"€",name:"Euro (EUR)"}};
+const UOMS=["un","kg","L","cx"], CAPUOMS=["un","kg","L","cx","t","m³","posições-pallet"];
+const TC_DEFAULT={tenant:"Unidade demo",vertical:"genérica",currency:"BRL",uom:"un",capNoun:"armazenagem",capUom:"un",
+  nodeTypes:["CD","Filial","Planta"],kpi:{svc:"OTIF",wcp:"DSI",wc:"Working capital",cost:"Custo logístico",viol:"Violações de política"},supplyExt:true};
+const TC=JSON.parse(JSON.stringify(TC_DEFAULT));
+const TOKRE=/\{(\$|un|capun|cap|svc|wcp|wc|cost|viol)\}/g;
+function T(str){const m={"$":CUR[TC.currency].sym,un:TC.uom,capun:TC.capUom,cap:TC.capNoun,svc:TC.kpi.svc,wcp:TC.kpi.wcp,wc:TC.kpi.wc,cost:TC.kpi.cost,viol:TC.kpi.viol};
+  return String(str).replace(TOKRE,(_,k)=>m[k]);}
+const TATTR=["title","aria-label","placeholder"];
+function applyT(root){
+  if(!root)return;
+  if(root.nodeType===3){if(root.data.indexOf("{")>-1&&!/^(SCRIPT|STYLE)$/.test(root.parentNode&&root.parentNode.nodeName)){const t=T(root.data);if(t!==root.data)root.data=t;}return;}
+  if(root.nodeType!==1||/^(SCRIPT|STYLE)$/.test(root.nodeName))return;
+  const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:n=>/^(SCRIPT|STYLE)$/.test(n.parentNode.nodeName)?2:1});let n;
+  while((n=w.nextNode())){if(n.data.indexOf("{")>-1){const t=T(n.data);if(t!==n.data)n.data=t;}}
+  [root,...root.querySelectorAll("[title],[aria-label],[placeholder]")].forEach(el=>TATTR.forEach(a=>{const v=el.getAttribute(a);if(v&&v.indexOf("{")>-1)el.setAttribute(a,T(v));}));
+}
+const TPL=new Map();
+
+/* ---------------- CADASTRO: definições (§5) ---------------- */
+const ENT={
+  politicas:{label:"Políticas",sec:"§5.1",solid:true,noun:"política",g:"f",prefix:"POL",
+    desc:"Estoque, working capital/caixa, serviço e regras de escalonamento (o que o A4/A5 decide sozinho vs. o que vai para humano).",
+    cols:["id","nome","tipo","escopo","valor","status","ver"],
+    fields:[
+      {k:"nome",l:"Nome",req:1},
+      {k:"tipo",l:"Tipo",opt:["Estoque","Working capital","Serviço","Escalonamento"],req:1},
+      {k:"escopo",l:"Escopo (nó/família/canal)",req:1},
+      {k:"metrica",l:"Métrica (rótulos de KPI = aliases do tenant)",opt:["Safety stock (dias)","{wcp} máx (dias)","{svc} mín (%)","Teto WC ({$} mi)","Alçada ({$} mi)","Cobertura min/max (dias)"]},
+      {k:"valor",l:"Valor",req:1},
+      {k:"acao",l:"Se violar",opt:["A5 auto-resolve","Alerta A6","Escalar humano"]},
+      {k:"dono",l:"Dono",opt:["Supply","Finance","Sales","Domain owner"]}],
+    rows:[
+      {id:"POL-01",nome:"Safety stock padrão",tipo:"Estoque",escopo:"Todos os CDs · Família A",metrica:"Safety stock (dias)",valor:"18",acao:"Alerta A6",dono:"Supply"},
+      {id:"POL-02",nome:"{wcp} máximo da rede",tipo:"Working capital",escopo:"Rede inteira",metrica:"{wcp} máx (dias)",valor:"45",acao:"Escalar humano",dono:"Finance"},
+      {id:"POL-03",nome:"{svc} alvo B2B",tipo:"Serviço",escopo:"Canal B2B · todas as filiais",metrica:"{svc} mín (%)",valor:"95",acao:"Alerta A6",dono:"Sales"},
+      {id:"POL-04",nome:"Alçada Finance investimento",tipo:"Escalonamento",escopo:"Qualquer cenário",metrica:"Alçada ({$} mi)",valor:"2",acao:"Escalar humano",dono:"Finance"},
+      {id:"POL-05",nome:"Cobertura CD2 Contagem",tipo:"Estoque",escopo:"CD2 Contagem · Família B",metrica:"Cobertura min/max (dias)",valor:"12–30",acao:"A5 auto-resolve",dono:"Supply"},
+      {id:"POL-06",nome:"Teto WC trimestral",tipo:"Working capital",escopo:"BU demo",metrica:"Teto WC ({$} mi)",valor:"48",acao:"Escalar humano",dono:"Finance",status:"draft"}]},
+  rede:{label:"Rede & capacidade",sec:"§5.2",solid:true,noun:"nó",g:"m",prefix:"N",
+    desc:"Nós (tipos vêm da Config do tenant), capacidade de {cap} por nó ({capun}) e calendários de indisponibilidade. Nó sem capacidade cadastrada = gap que bloqueia o A4.",
+    cols:["id","nome","tipo","cidade","capacidade","calendario","status","ver"],
+    fields:[
+      {k:"nome",l:"Nome",req:1},
+      {k:"tipo",l:"Tipo de nó (Config do tenant)",get opt(){return TC.nodeTypes;},req:1},
+      {k:"cidade",l:"Cidade/UF",req:1},
+      {k:"capacidade",l:"Capacidade de {cap} ({capun})",req:1,gapIfEmpty:1},
+      {k:"calendario",l:"Calendário",opt:["Seg–Sáb","Seg–Sex","24×7"]},
+      {k:"indisp",l:"Indisponibilidades programadas"}],
+    rows:[
+      {id:"CD1",nome:"CD1 Jundiaí",tipo:"CD",cidade:"Jundiaí/SP",capacidade:"12.000",calendario:"24×7",indisp:"Manutenção área 3 · 10–14/11"},
+      {id:"CD2",nome:"CD2 Contagem",tipo:"CD",cidade:"Contagem/MG",capacidade:"8.500",calendario:"Seg–Sáb",indisp:""},
+      {id:"CD3",nome:"CD3 Uberlândia",tipo:"CD",cidade:"Uberlândia/MG",capacidade:"6.000",calendario:"Seg–Sáb",indisp:"Feriado municipal 31/08"},
+      {id:"FIL-CPS",nome:"Filial Campinas (âncora Y)",tipo:"Filial",cidade:"Campinas/SP",capacidade:"900",calendario:"Seg–Sáb",indisp:""},
+      {id:"FIL-RAO",nome:"Filial Ribeirão Preto (nova)",tipo:"Filial",cidade:"Ribeirão Preto/SP",capacidade:"",calendario:"Seg–Sáb",indisp:"Abertura prevista M+7",status:"draft"}]},
+  logistica:{label:"Logística",sec:"§5.3",noun:"rota",g:"f",prefix:"R",
+    desc:"Grafo de rotas origem→destino, modo, janelas de entrega, custo e lead time.",
+    cols:["id","origem","destino","modo","janela","custo","lead","status","ver"],
+    fields:[{k:"origem",l:"Origem",req:1},{k:"destino",l:"Destino",req:1},{k:"modo",l:"Modo",opt:["Rodoviário","Ferroviário/intermodal","Aéreo/expresso"]},
+      {k:"janela",l:"Janela de entrega"},{k:"custo",l:"Custo ({$}/{un})",req:1},{k:"lead",l:"Lead time (dias)",req:1}],
+    rows:[
+      {id:"R-01",origem:"CD1 Jundiaí",destino:"Filial Campinas",modo:"Rodoviário",janela:"06h–14h",custo:"38",lead:"1"},
+      {id:"R-02",origem:"CD1 Jundiaí",destino:"Filial Ribeirão Preto",modo:"Rodoviário",janela:"06h–12h",custo:"71",lead:"2",status:"draft"},
+      {id:"R-03",origem:"CD2 Contagem",destino:"CD3 Uberlândia",modo:"Ferroviário/intermodal",janela:"Ter/Qui",custo:"44",lead:"3"},
+      {id:"R-04",origem:"CD3 Uberlândia",destino:"Filial Ribeirão Preto",modo:"Rodoviário",janela:"07h–13h",custo:"63",lead:"2",status:"draft"}]},
+  produtos:{label:"Produtos & custos",sec:"§5.4",noun:"SKU",g:"m",prefix:"SKU",
+    desc:"SKUs/famílias, custo e atributos que afetam armazenagem e movimento.",
+    cols:["id","nome","familia","custo","abc","status","ver"],
+    fields:[{k:"nome",l:"Descrição",req:1},{k:"familia",l:"Família",opt:["Família A","Família A2","Família B","Família C"]},
+      {k:"custo",l:"Custo unitário ({$}/{un})",req:1},{k:"abc",l:"Classe ABC",opt:["A","B","C"]},{k:"armaz",l:"Restrição de armazenagem"}],
+    rows:[
+      {id:"SKU-A1",nome:"Item A1 · alto giro",familia:"Família A",custo:"5.420",abc:"A",armaz:"Armazenagem dedicada"},
+      {id:"SKU-A2",nome:"Item A2 · alto giro",familia:"Família A2",custo:"5.880",abc:"A",armaz:"Armazenagem dedicada"},
+      {id:"SKU-B1",nome:"Item B1 · caixa",familia:"Família B",custo:"14.900",abc:"B",armaz:"Paletizado"},
+      {id:"SKU-C1",nome:"Item C1",familia:"Família C",custo:"31.000",abc:"C",armaz:"Paletizado, controle ambiental"}]},
+  contratos:{label:"Contratos de fornecedor",sec:"§5.5",solid:true,noun:"contrato",g:"m",prefix:"CT",
+    desc:"Obrigatório no otimizador: take-or-pay, volumes mín., janelas de pedido, prazos, penalidades. Alavancas dialogáveis (adiar/antecipar, shift entre grupos) aparecem para o A4 e o A2.",
+    cols:["id","fornecedor","tipo","volume","prazo","vigencia","status","ver"],
+    fields:[
+      {k:"fornecedor",l:"Fornecedor / grupo",req:1},
+      {k:"tipo",l:"Tipo de obrigação",opt:["Take-or-pay","Volume mínimo","Exclusividade","Spot"],req:1},
+      {k:"volume",l:"Volume ({un}/mês)",req:1},
+      {k:"prazo",l:"Prazo de pagamento (dias)"},
+      {k:"janela",l:"Janela de pedido"},
+      {k:"penalidade",l:"Penalidade"},
+      {k:"vigencia",l:"Vigência",req:1},
+      {k:"alavanca",l:"Alavancas dialogáveis",opt:["Nenhuma","Adiar/antecipar prazo","Shift de volume entre grupos","Ambas"]}],
+    rows:[
+      {id:"CT-101",fornecedor:"Fornecedor Alfa (grupo A)",tipo:"Take-or-pay",volume:"9.000",prazo:"28",janela:"D-5, semanal",penalidade:"100% do volume não retirado",vigencia:"01/2026–12/2027",alavanca:"Adiar/antecipar prazo"},
+      {id:"CT-102",fornecedor:"Fornecedor Beta (grupo B)",tipo:"Volume mínimo",volume:"3.500",prazo:"21",janela:"Quinzenal",penalidade:"8% sobre déficit",vigencia:"07/2025–06/2027",alavanca:"Shift de volume entre grupos"},
+      {id:"CT-103",fornecedor:"Fornecedor Gama",tipo:"Exclusividade",volume:"420",prazo:"45",janela:"Mensal",penalidade:"Multa fixa {$} 250 mil",vigencia:"01/2026–12/2026",alavanca:"Nenhuma"},
+      {id:"CT-104",fornecedor:"Fornecedor Delta",tipo:"Spot",volume:"",prazo:"30",janela:"Sob demanda",penalidade:"—",vigencia:"",alavanca:"Nenhuma",status:"draft"}]},
+  historico:{label:"Histórico & âncoras",sec:"§5.6",noun:"âncora",g:"f",prefix:"H",
+    desc:"Séries de venda por nó/SKU (extract opinionated, não data lake) e filiais-âncora para “abrir filial semelhante a Y”.",
+    cols:["id","nome","no","serie","fonte","status","ver"],
+    fields:[{k:"nome",l:"Nome",req:1},{k:"no",l:"Nó",req:1},{k:"serie",l:"Período da série"},{k:"fonte",l:"Fonte",opt:["Extract CSV","API ERP (stub)","Manual"]},{k:"ancora",l:"Usar como âncora de similaridade?",opt:["Sim","Não"]}],
+    rows:[
+      {id:"H-01",nome:"Vendas Campinas (âncora Y)",no:"Filial Campinas",serie:"01/2023–09/2026 · semanal",fonte:"Extract CSV",ancora:"Sim"},
+      {id:"H-02",nome:"Vendas CD2 → B2B MG",no:"CD2 Contagem",serie:"01/2024–09/2026 · semanal",fonte:"API ERP (stub)",ancora:"Não"},
+      {id:"H-03",nome:"Vendas Uberlândia varejo",no:"CD3 Uberlândia",serie:"06/2024–09/2026 · semanal",fonte:"Extract CSV",ancora:"Não"}]},
+  financas:{label:"Finance drivers",sec:"§5.7",noun:"driver",g:"m",prefix:"FD",
+    desc:"Como volume, preço, prazo e investimento viram caixa, margem e {wc} ({wcp}/DIO e proxies). Persistido em <code>finance_drivers.mapping</code> (jsonb, versionado · W0 SQL). Alimenta takeaways, value board e a fila de alçada; não bloqueia o A4.",
+    cols:["id","driver","alvo","regra","fonte","status","ver"],
+    fields:[
+      {k:"driver",l:"Driver de entrada",opt:["Volume","Preço","Prazo de pagamento (fornecedor)","Prazo de recebimento (cliente)","Investimento","Custo unitário"],req:1},
+      {k:"alvo",l:"Impacta",opt:["Caixa","Margem","{wc} · estoque","{wc} · {wcp}"],req:1},
+      {k:"regra",l:"Regra de cálculo (mapping)",req:1},
+      {k:"fonte",l:"Fonte do dado",opt:["Produtos & custos","Contratos de fornecedor","Políticas","Histórico & âncoras","Premissa de cenário (A1–A3)"]},
+      {k:"granul",l:"Granularidade",opt:["Semana","Mês"]},
+      {k:"dono",l:"Dono",opt:["Finance","Supply","Sales","Domain owner"]}],
+    rows:[
+      {id:"FD-01",driver:"Volume",alvo:"{wc} · estoque",regra:"estoque médio = cobertura (dias, POL-01) × demanda diária × custo unit. (SKU)",fonte:"Políticas",granul:"Semana",dono:"Finance"},
+      {id:"FD-02",driver:"Preço",alvo:"Margem",regra:"margem bruta = (preço − custo unit. − custo de servir da rota) × volume",fonte:"Premissa de cenário (A1–A3)",granul:"Mês",dono:"Finance"},
+      {id:"FD-03",driver:"Prazo de pagamento (fornecedor)",alvo:"Caixa",regra:"Δ caixa = compras do período × prazo do contrato ÷ 30",fonte:"Contratos de fornecedor",granul:"Mês",dono:"Finance"},
+      {id:"FD-04",driver:"Investimento",alvo:"Caixa",regra:"capex no mês de abertura; valor > alçada (POL-04) ⇒ fila de alçada Finance",fonte:"Premissa de cenário (A1–A3)",granul:"Mês",dono:"Finance"},
+      {id:"FD-05",driver:"Volume",alvo:"{wc} · {wcp}",regra:"{wcp} = estoque médio ÷ custo das vendas diário",fonte:"Produtos & custos",granul:"Semana",dono:"Finance"},
+      {id:"FD-06",driver:"Prazo de recebimento (cliente)",alvo:"Caixa",regra:"",fonte:"",granul:"Mês",dono:"Finance",status:"draft"}]}
+};
+const COLNAME={id:"ID",nome:"Nome",tipo:"Tipo",escopo:"Escopo",valor:"Valor",status:"Status",ver:"Versão",cidade:"Cidade",capacidade:"Capacidade ({capun})",calendario:"Calendário",
+  origem:"Origem",destino:"Destino",modo:"Modo",janela:"Janela",custo:"Custo",lead:"Lead (d)",familia:"Família",abc:"ABC",fornecedor:"Fornecedor",volume:"Volume {un}/mês",prazo:"Prazo (d)",vigencia:"Vigência",no:"Nó",serie:"Série",fonte:"Fonte",driver:"Driver",alvo:"Impacta",regra:"Regra"};
+const AUTH=["Ana (Supply)","Bruno (Finance)","Felipe (Domain owner)","Carla (Sales)"];
+for(const [key,e] of Object.entries(ENT)){
+  e.rows.forEach((r,i)=>{r.status=r.status||"publicado";r.ver=r.status==="draft"?1:2+(i%3);
+    r.hist=[];for(let v=1;v<=r.ver;v++)r.hist.push({v,by:AUTH[(i+v)%4],when:v===r.ver?"28/10/2026":"0"+(v+2)+"/09/2026",why:v===1?"Carga inicial (extract)":"Ajuste revisado em S&OP mensal"});});
+}
+function gapsOf(key,r){const e=ENT[key];if(r.status==="arquivado")return [];
+  return e.fields.filter(f=>f.req&&!String(r[f.k]??"").trim()).map(f=>({key,id:r.id,field:f.l,block:!!f.gapIfEmpty||key==="contratos"}));}
+let capGaps=[];   /* PremiseCard type=Gap, links.nodeId obrigatório (registrado pela lente Supply) */
+function allGaps(){return Object.keys(ENT).flatMap(k=>ENT[k].rows.flatMap(r=>gapsOf(k,r)))
+  .concat(capGaps.filter(g=>g.open).map(g=>({key:"rede",id:g.nodeId,field:g.id+" · gap de capacidade",block:true})));}
+const pub=k=>ENT[k].rows.filter(r=>r.status==="publicado");
+/* Prontidão A4 — checklist mínimo (contrato visual). % = itens mínimos ok ÷ itens exigidos. */
+function checklist(){const pol=pub("politicas"),nodes=pub("rede").filter(r=>String(r.capacidade||"").trim()),rt=pub("logistica"),ct=pub("contratos");
+  const wcPol=pol.filter(p=>p.tipo==="Working capital"),est=pol.filter(p=>p.tipo==="Estoque"),svc=pol.filter(p=>p.tipo==="Serviço");
+  return [
+   {k:"pol",tab:"politicas",first:"＋ primeira política",label:"Política de {wc} (ou Estoque + Serviço)",req:true,ok:wcPol.length>0||(est.length>0&&svc.length>0),
+    by:wcPol.length?wcPol.map(p=>p.id):est.concat(svc).map(p=>p.id)},
+   {k:"node",tab:"rede",first:"＋ primeiro nó",label:"≥ 1 nó publicado com capacidade",req:true,ok:nodes.length>0,by:nodes.map(r=>r.id)},
+   {k:"route",tab:"logistica",first:"＋ primeira rota",label:"≥ 1 rota publicada",req:true,ok:rt.length>0,by:rt.map(r=>r.id)},
+   {k:"ct",tab:"contratos",first:"＋ primeiro contrato",label:"≥ 1 contrato de fornecedor publicado",req:TC.supplyExt,ok:ct.length>0,by:ct.map(r=>r.id),
+    rule:"Exigido só se supply externo (compra de terceiros) estiver no escopo do tenant."}];}
+function readiness(){const c=checklist(),need=c.filter(x=>x.req),met=need.filter(x=>x.ok).length,blocks=allGaps().filter(g=>g.block);
+  const pct=need.length?Math.round(100*met/need.length):0,all=met===need.length;
+  return {c,need:need.length,met,pct,blocks,state:!all?"block":blocks.length?"warn":"ok",label:!all?"A4 bloqueado":blocks.length?"A4 pronto c/ restrições":"A4 pronto"};}
+function checklistHTML(compact){const R=readiness();
+  return `<ul class="clean checklist">${R.c.map(x=>`<li><span class="tag ${!x.req?"":x.ok?"ok":"gap"}">${!x.req?"n/a":x.ok?"ok":"falta"}</span><div style="flex:1"><b>${x.label}</b>
+    ${x.ok&&x.by.length?`<div class="hint">atendido por ${x.by.slice(0,4).map(id=>esc(id)).join(", ")}${x.by.length>4?"…":""}</div>`:""}
+    ${x.rule&&!compact?`<div class="hint">${x.rule} <label><input type="checkbox" data-supplyext="1" ${TC.supplyExt?"checked":""}> supply externo no escopo</label></div>`:""}</div>
+    ${x.req&&!x.ok?`<button class="btn sm ${compact?"":"primary"}" data-ckgo="${x.tab}" data-cknew="${ENT[x.tab].rows.length?"":"1"}">${ENT[x.tab].rows.length?"Ir para "+ENT[x.tab].label:x.first}</button>`:""}</li>`).join("")}</ul>`;}
+
+let curTab="politicas", cadFilter="", cadOnlyGaps=false;
+function renderReady(){
+  const g=allGaps(), total=Object.values(ENT).reduce((a,e)=>a+e.rows.filter(r=>r.status!=="arquivado").length,0);
+  const bad=new Set(g.map(x=>x.key+x.id)).size, comp=total?Math.round(100*(total-bad)/total):0, R=readiness();
+  $("#readyPct").textContent=R.pct+"% do mínimo A4 ("+R.met+"/"+R.need+") · registros "+comp+"% completos";
+  $("#readyState").className="tag "+R.state;$("#readyState").textContent=R.label;
+  $("#readyMeter").setAttribute("aria-valuenow",R.pct);$("#readyMeter").setAttribute("aria-valuetext",R.pct+"% · "+R.label);
+  $("#readyList").innerHTML=checklistHTML(false);
+  $("#readyBar").style.width=R.pct+"%";$("#readyBar").style.background=R.state==="block"?"var(--gap)":R.state==="warn"?"var(--warn)":"var(--ok)";
+  $("#readyGaps").innerHTML=!total?"Nenhum registro ainda — tenant novo.":g.length?("Gaps: "+g.map(x=>`<button class="link" data-goto="${x.key}" data-id="${esc(x.id)}">${esc(x.id)} · ${esc(x.field)}</button>${x.block?' <span class="tag block">block</span>':' <span class="tag warn">warn</span>'}`).join(" · ")+(R.state==="warn"?'<p class="hint">A4 roda; gaps <b>block</b> travam só cenários que tocam esses objetos.</p>':"")):"Sem gaps — A4 pode rodar com a versão atual do cadastro.";
+  const nb=g.filter(x=>x.block).length;$("#navGap").textContent=nb||"";$("#navGap").style.display=nb?"":"none";
+  $("#pulseGapCnt").textContent=g.length;
+}
+function renderTabs(){
+  $("#cadTabs").innerHTML=Object.entries(ENT).map(([k,e])=>`<button role="tab" id="tab-${k}" aria-selected="${k===curTab}" tabindex="${k===curTab?0:-1}" data-tab="${k}">${e.label}<span class="cnt">${e.rows.filter(r=>r.status!=="arquivado").length}</span></button>`).join("");
+  $("#cadPanel").setAttribute("aria-labelledby","tab-"+curTab);
+}
+function cell(key,r,c){
+  if(c==="status")return `<span class="tag ${r.status==="publicado"?"ok":r.status==="draft"?"warn":""}">${r.status}</span>`;
+  if(c==="ver")return "v"+r.ver;
+  const v=r[c];if(!String(v??"").trim()){const f=ENT[key].fields.find(f=>f.k===c);return f&&f.req?'<span class="tag gap">gap</span>':"—";}
+  return esc(v);
+}
+function renderCad(){
+  renderTabs();const e=ENT[curTab];
+  let rows=e.rows.filter(r=>!cadFilter||JSON.stringify(r).toLowerCase().includes(cadFilter.toLowerCase()));
+  if(cadOnlyGaps)rows=rows.filter(r=>gapsOf(curTab,r).length);
+  $("#cadPanel").innerHTML=`
+   <div class="row" style="margin-bottom:10px"><div><b>${e.label}</b> <span class="tag">${e.sec}</span>${e.solid?"":' <span class="tag info">lista simples</span>'}<div class="hint" style="max-width:720px">${e.desc}</div></div>
+    <span class="sp"></span>
+    <input class="f" style="width:200px" type="search" id="cadSearch" placeholder="Filtrar…" aria-label="Filtrar ${e.label}" value="${esc(cadFilter)}">
+    <label class="hint"><input type="checkbox" id="onlyGaps" ${cadOnlyGaps?"checked":""}> só com gap</label>
+    <button class="btn primary" id="cadNew">＋ ${e.g==="f"?"Nova":"Novo"} ${e.noun}</button></div>
+   <div class="tblwrap"><table><thead><tr>${e.cols.map(c=>`<th>${COLNAME[c]||c}</th>`).join("")}<th><span class="hint">Ações</span></th></tr></thead><tbody>
+   ${!e.rows.length?`<tr><td colspan="${e.cols.length+1}"><div class="empty"><b>${e.g==="f"?"Nenhuma":"Nenhum"} ${e.noun} cadastrad${e.g==="f"?"a":"o"} neste tenant.</b><div class="hint">${checklist().some(x=>x.tab===curTab&&x.req)?"Obrigatório para o A4 rodar (ver checklist acima).":"Opcional para o A4; enriquece cenários e takeaways."}</div>
+      <button class="btn primary" data-new="1">＋ ${e.g==="f"?"Primeira":"Primeiro"} ${e.noun}</button></div></td></tr>`
+    :rows.length?rows.map(r=>`<tr class="clk ${r.status==="arquivado"?"archived":""}" data-id="${esc(r.id)}" tabindex="0" aria-label="Editar ${esc(r.id)}">${e.cols.map(c=>`<td>${cell(curTab,r,c)}</td>`).join("")}<td><button class="btn sm" data-edit="${esc(r.id)}">Editar</button></td></tr>`).join("")
+     :`<tr><td colspan="${e.cols.length+1}"><div class="empty">${cadOnlyGaps?"Nenhum registro com gap nesta aba. 🎉":"Nada encontrado para o filtro."}</div></td></tr>`}
+   </tbody></table></div>
+   <p class="hint">Clique na linha para editar. Publicar gera nova versão; cenários que usam a versão anterior ficam <b>stale</b> em Cenários.</p>
+   ${curTab==="rede"?`<h3 style="margin-top:14px">Gaps de capacidade registrados <span class="hint">(PremiseCard type=Gap · links.nodeId obrigatório)</span></h3>
+     ${capGaps.length?`<ul class="clean">${capGaps.map(g=>`<li><span class="tag ${g.open?"block":"ok"}">${g.open?"block":"resolvido"}</span><div style="flex:1"><b>${esc(g.id)} · ${esc(g.nodeId)}</b> — ${esc(g.tipo)}${g.periodo?" · "+esc(g.periodo):""}${g.need?" · +"+esc(g.need)+" {capun}":""}<br><span class="hint">${esc(g.why)}</span></div>${g.open?`<button class="btn sm" data-gapres="${esc(g.id)}">Marcar resolvido</button>`:""}</li>`).join("")}</ul>`
+     :'<p class="hint">Nenhum. Registre pela lente Supply (Visões → Supply → “Registrar gap de capacidade”) ou aqui.</p>'}
+     <button class="btn sm" data-lensact="supply">＋ Registrar gap de capacidade</button>`:""}`;
+  renderReady();
+}
+function openEntity(key,id){
+  const e=ENT[key];const isNew=!id;const r=isNew?{id:(e.prefix||e.noun.slice(0,3).toUpperCase())+"-"+String(e.rows.length+1).padStart(2,"0"),status:"draft",ver:0,hist:[]}:e.rows.find(x=>x.id===id);
+  if(!r)return;
+  const body=`<p class="hint">${e.sec} · ${esc(r.id)} · ${isNew?"novo registro":"versão atual v"+r.ver+" · "+r.status}</p>
+   <form id="entForm" novalidate>
+   ${e.fields.map(f=>`<div class="fld"><label for="f-${f.k}">${f.l}${f.req?" *":""}</label>
+     ${f.opt?`<select class="f" id="f-${f.k}" name="${f.k}"><option value="">—</option>${f.opt.map(o=>`<option ${r[f.k]===o?"selected":""}>${esc(o)}</option>`).join("")}${r[f.k]&&!f.opt.includes(r[f.k])?`<option selected data-raw="${esc(r[f.k])}">${esc(r[f.k])} (fora da config)</option>`:""}</select>`
+       :`<input class="f" id="f-${f.k}" name="${f.k}" value="${esc(r[f.k])}">`}
+     ${f.gapIfEmpty?'<div class="hint">Vazio = Gap linkado a este nó (bloqueia A4).</div>':""}<div class="err" id="e-${f.k}"></div></div>`).join("")}
+   <div class="fld"><label for="f-why">Porquê da mudança * <span class="hint">(audit trail)</span></label><input class="f" id="f-why" placeholder="ex.: capacidade revisada após vistoria"><div class="err" id="e-why"></div></div>
+   </form>
+   ${r.hist.length?`<h3 style="margin-top:16px">Histórico de versões</h3>${r.hist.slice().reverse().map(h=>`<div class="ver ${h.v===r.ver?"cur":""}"><b>v${h.v}</b> · ${esc(h.by)} · ${esc(h.when)}<br><span class="hint">${esc(h.why)}</span></div>`).join("")}`:""}
+   ${key==="rede"&&!isNew?`<h3 style="margin-top:16px">Usado por</h3><p class="hint">Cenários: ${scen.filter(s=>s.nodes.includes(r.id)).map(s=>esc(s.nome)).join(", ")||"nenhum"}</p>`:""}`;
+  const foot=`<button class="btn primary" id="entPub">Publicar v${r.ver+1}</button><button class="btn" id="entDraft">Salvar rascunho</button><span class="sp"></span>
+    ${!isNew&&r.status!=="arquivado"?'<button class="btn danger" id="entArch">Arquivar</button>':""}${r.status==="arquivado"?'<button class="btn" id="entRestore">Restaurar</button>':""}`;
+  openDrawer((isNew?(e.g==="f"?"Nova ":"Novo "):"Editar ")+e.noun+(isNew?"":" · "+r.id),body,foot);
+  const collect=(pub)=>{let ok=true;const vals={};
+    e.fields.forEach(f=>{const el=$("#f-"+f.k);vals[f.k]=f.opt?(el.selectedIndex<=0?"":(f.opt[el.selectedIndex-1]??el.options[el.selectedIndex].dataset.raw??"")):el.value.trim();const bad=pub&&f.req&&!vals[f.k]&&!f.gapIfEmpty;el.setAttribute("aria-invalid",bad);$("#e-"+f.k).textContent=bad?"Obrigatório para publicar.":"";if(bad)ok=false;});
+    const why=$("#f-why").value.trim();const wbad=!why;$("#f-why").setAttribute("aria-invalid",wbad);$("#e-why").textContent=wbad?"Explique o porquê — vai para o audit trail.":"";if(wbad)ok=false;
+    if(!ok){const first=$("#entForm [aria-invalid=true]");first&&first.focus();return null;}return {vals,why};};
+  const save=(pub)=>{const c=collect(pub);if(!c)return;Object.assign(r,c.vals);r.ver+=1;r.status=pub?"publicado":"draft";r.hist.push({v:r.ver,by:"Felipe (Domain owner)",when:today,why:c.why});
+    if(isNew)e.rows.push(r);if(pub)markStale(key,r.id);closeDrawer();renderCad();renderScn();toast((pub?"Publicado ":"Rascunho salvo ")+r.id+" v"+r.ver+(pub?" · cenários dependentes marcados stale":""));};
+  $("#entPub").onclick=()=>save(true);$("#entDraft").onclick=()=>save(false);
+  $("#entArch")&&($("#entArch").onclick=()=>{if(!$("#f-why").value.trim()){$("#f-why").setAttribute("aria-invalid",true);$("#e-why").textContent="Explique o porquê do arquivamento.";$("#f-why").focus();return;}
+    r.status="arquivado";r.hist.push({v:r.ver,by:"Felipe (Domain owner)",when:today,why:"Arquivado: "+$("#f-why").value.trim()});closeDrawer();renderCad();toast(r.id+" arquivado");});
+  $("#entRestore")&&($("#entRestore").onclick=()=>{r.status="draft";closeDrawer();renderCad();toast(r.id+" restaurado como rascunho");});
+}
+
+/* ---------------- CENÁRIOS ---------------- */
+const scen=[
+  {id:"SCN-0100",nome:"Baseline",origem:"Geração automática",status:"otimizado",cad:"cad v41",wc:"0",otif:"96,1%",viol:0,upd:"30/10 · 02:10",nodes:["CD1","CD2","CD3","FIL-CPS"],
+    reasons:[{rank:1,kind:"capacidade",summary:"CD1 a 91% em nov (manutenção área 3)",severity:"warn",refs:{nodeId:"CD1",period:"2026-11"}},{rank:2,kind:"custo",summary:"Rota R-03 intermodal mais barata que rodoviário em 18%",severity:"info",refs:{routeId:"R-03"}}],counts:{capacidade:3,custo:5,janela:1,contrato:0,outro:0},sv:7},
+  {id:"SCN-0145",nome:"Abrir filial Y (Ribeirão ≈ Campinas)",origem:"Ditado · Carla (Sales)",status:"stale",cad:"cad v40",wc:"+{$} 3,4 mi",otif:"95,2%",viol:2,upd:"29/10 · 18:40",inv:3.4,nodes:["CD1","CD3","FIL-RAO","FIL-CPS"],
+    reasons:[{rank:1,kind:"contrato",summary:"Take-or-pay CT-101 cobre só 60% do volume incremental",severity:"block",refs:{nodeId:"CD1",skuId:"SKU-A1"}},{rank:2,kind:"janela",summary:"Janela R-02 (06h–12h) aperta abastecimento Ribeirão",severity:"warn",refs:{routeId:"R-02"}},{rank:3,kind:"capacidade",summary:"Ribeirão sem capacidade cadastrada (Gap)",severity:"block",refs:{nodeId:"FIL-RAO"}}],counts:{contrato:2,janela:3,capacidade:1,custo:2,outro:0},sv:3,escala:"Finance (>{$}2mi)"},
+  {id:"SCN-0151",nome:"Stress supply — fornecedor principal −20% Q1",origem:"Geração automática",status:"otimizado",cad:"cad v41",wc:"+{$} 1,1 mi",otif:"93,4%",viol:3,upd:"30/10 · 02:12",nodes:["CD1","CD2","CD3"],
+    reasons:[{rank:1,kind:"contrato",summary:"Shift de volume grupo A→B evita ruptura CD2",severity:"warn",refs:{nodeId:"CD2"}},{rank:2,kind:"janela",summary:"{svc} B2B MG cai para 93,4% (política ≥95%)",severity:"block",refs:{nodeId:"CD2",period:"2027-Q1"}}],counts:{contrato:4,janela:2,tancagem:1,custo:1,outro:1},sv:2,legacy:1},  /* payload legado de propósito: "tancagem" → normalizado p/ "capacidade" */
+  {id:"SCN-0153",nome:"Upside Família C (+15%)",origem:"Ditado · Ana (Supply)",status:"draft",cad:"cad v41",wc:"—",otif:"—",viol:null,upd:"29/10 · 21:05",nodes:["CD2"],reasons:[],counts:{},sv:1}
+];
+scen.forEach(s=>{s.reasons.forEach(r=>r.kind=normKind(r.kind));s.counts=normCounts(s.counts);});
+let scnFilter="", cmp=new Set(), decisions=[];
+const alcada=()=>{const p=pub("politicas").find(p=>p.metrica==="Alçada ({$} mi)");return p?parseFloat(String(p.valor).replace(",",".")):null;};
+const fmtMi=v=>"{$} "+String(v).replace(".",",")+" mi";
+const queue=()=>{const a=alcada();return a==null?[]:scen.filter(s=>s.inv>a&&!decisions.some(d=>d.scenarioId===s.id&&d.scenarioVersion===s.sv));};
+function markStale(key,id){scen.forEach(s=>{if(s.status==="otimizado"&&(key!=="rede"||s.nodes.includes(id))){s.status="stale";s.upd=today+" · agora";}});}
+const stTag=s=>`<span class="tag ${s==="otimizado"?"ok":s==="stale"?"warn":s==="escalado"?"block":""}">${s}</span>`;
+function renderScn(){
+  $("#scnRows").innerHTML=scen.filter(s=>!scnFilter||s.status===scnFilter).map(s=>`<tr class="clk" data-scn="${s.id}" tabindex="0">
+    <td><input type="checkbox" aria-label="Comparar ${esc(s.nome)}" data-cmp="${s.id}" ${cmp.has(s.id)?"checked":""}></td>
+    <td><b>${esc(s.nome)}</b><br><span class="hint">${s.id} · v${s.sv}</span></td><td>${esc(s.origem)}</td>
+    <td>${stTag(s.status)}${s.escala?` <span class="tag block" title="alçada">${esc(s.escala)}</span>`:""}${s.aprov?` <span class="tag ok">${esc(s.aprov)}</span>`:""}</td><td>${s.cad}${s.status==="stale"?' <span class="hint">(atual v41+)</span>':""}</td>
+    <td>${s.wc}</td><td>${s.otif}</td><td>${s.viol==null?"—":s.viol?`<span class="tag ${s.viol>2?"block":"warn"}">${s.viol}</span>`:'<span class="tag ok">0</span>'}</td><td>${s.upd}</td></tr>`).join("")||`<tr><td colspan="9"><div class="empty">${scen.length?"Nenhum cenário neste status.":`<b>Nenhum cenário ainda neste tenant.</b><div class="hint">Próximo passo: completar o mínimo do cadastro e criar o <b>Baseline</b> (1º run do A4).</div><button class="btn primary" data-ckgo="cenarios-novo">＋ Criar primeiro cenário</button>`}</div></td></tr>`;
+  $("#newFlowReady").innerHTML=readiness().state==="block"?`<div class="alert warn" style="margin:0"><b>A4 ainda não pode rodar neste tenant.</b> Dá para ditar premissas, mas o run fica bloqueado até o mínimo:${checklistHTML(true)}</div>`:`<span class="tag ${readiness().state}">${readiness().label}</span> <span class="hint">cadastro mínimo ok para o run</span>`;
+  $("#cmpBtn").disabled=cmp.size<2;$("#cmpHint").textContent=cmp.size?cmp.size+"/3 selecionados":"Selecione 2–3 para comparar no cockpit";
+}
+function openScn(id){const s=scen.find(x=>x.id===id);
+  const body=`<p>${stTag(s.status)} <span class="hint">${s.id} · scenarioVersion ${s.sv} · ${s.cad}</span></p>
+   ${s.status==="stale"?'<div class="alert warn">Cadastro ou premissa mudou depois do último run. Re-rode o A4 antes de decidir.</div>':""}
+   ${s.status==="draft"?'<div class="alert info">Rascunho — premissas ainda não passaram pelo A4. Continue no wizard.</div>':""}
+   <div class="grid g3" style="margin-bottom:12px"><div class="card kpi"><div class="lbl">Δ {wc}</div><div class="val" style="font-size:18px">${s.wc}</div></div>
+   <div class="card kpi"><div class="lbl">{svc}</div><div class="val" style="font-size:18px">${s.otif}</div></div><div class="card kpi"><div class="lbl">{viol}</div><div class="val" style="font-size:18px">${s.viol??"—"}</div></div></div>
+   <h3>A4 · top razões <span class="hint">(A4RunSummary)</span></h3>
+   ${s.reasons.length?`<ul class="clean">${s.reasons.map(r=>`<li><span class="tag ${r.severity}">${r.severity}</span><div><b>#${r.rank} ${KIND[r.kind]||r.kind}</b> — ${esc(r.summary)}<br><span class="hint">${Object.entries(r.refs).map(([k,v])=>k+": "+v).join(" · ")}</span></div></li>`).join("")}</ul>
+     <p class="hint">countsByKind: ${Object.entries(s.counts).map(([k,v])=>(KIND[k]||k)+" "+v).join(" · ")}${s.legacy?' · <span class="tag info" title="payload veio com kind=tancagem (legado) e foi normalizado">legado normalizado</span>':""}</p>`:'<p class="hint">Sem run ainda.</p>'}
+   <h3 style="margin-top:12px">Nós envolvidos</h3><p>${s.nodes.map(n=>`<button class="link" data-goto="rede" data-id="${n}">${n}</button>`).join(" · ")}</p>`;
+  const foot=`<a class="btn primary" href="2026-10-30-ibp-agentic-ux-wire-happy-path-v0.2.html">${s.status==="draft"?"Continuar no wizard":"Abrir no wizard (v0.2)"}</a>
+    ${s.status==="stale"?'<button class="btn" id="rerun">Re-rodar A4</button>':""}<span class="sp"></span><span class="hint">Write-back fora da V0 · export do plano aprovado</span>`;
+  openDrawer(s.nome,body,foot);
+  $("#rerun")&&($("#rerun").onclick=()=>{$("#rerun").disabled=true;$("#rerun").textContent="A4 rodando…";setTimeout(()=>{s.status="otimizado";s.cad="cad v41";s.sv++;s.upd=today+" · agora";closeDrawer();renderScn();toast(s.nome+": run concluído (v"+s.sv+")");},900);});
+}
+
+/* ---------------- PULSE ---------------- */
+const kpis=[
+  {l:"{wc} (estoque)",v:"{$} 41,8 mi",d:"−{$} 1,2 mi vs. mês ant.",good:1,sub:"{wcp} proxy 39d · política ≤45d",sp:[52,50,49,47,46,44,43,42]},
+  {l:"Serviço · {svc}",v:"95,6%",d:"−0,4 pp",good:0,sub:"Política ≥95% · B2B MG 94,1%",sp:[97,96,96,95,96,95,96,95]},
+  {l:"{cost}",v:"{$} 63/{un}",d:"−{$} 2 vs. plano",good:1,sub:"Expedite: 3 viagens ({$} 41 mil)",sp:[70,69,67,66,66,65,64,63]},
+  {l:"{viol}",v:"4",d:"+1 desde ontem",good:0,sub:"2 block · 2 warn",sp:[1,2,2,3,2,3,3,4],viol:1}];
+const wc={18:{lbl:["S1","S2","S3","S4","M2","M3","M4","M5","M6","M7","M8","M9","M10","M11","M12","M14","M16","M18"],v:[41,42,41,40,40,39,40,41,42,47,46,44,43,42,41,41,40,40]},
+          6:{lbl:["S1","S2","S3","S4","S5","S6","S7","S8","M3","M4","M5","M6"],v:[41,42,41,40,40,40,39,39,39,40,41,42]},
+          3:{lbl:["S1","S2","S3","S4","S5","S6","S7","S8","S9","S10","S11","S12","S13"],v:[41,42,41,40,40,40,39,39,39,40,40,39,39]}};
+const pulse=[
+  {m:"Transferência TR-882 · Família A",r:"CD1 → Campinas",p:"420 {un} · 30/10",pl:"420 {un} · 30/10",dv:"0",s:"info",a:"Sem ação (no plano)"},
+  {m:"Compra PC-551 · Fornecedor Alfa",r:"Fornecedor → CD1",p:"2.100 {un} · 04/11",pl:"2.400 {un} · 02/11",dv:"−300 {un} · +2d",s:"block",a:"Take-or-pay CT-101: risco de penalidade → escalar Supply"},
+  {m:"Transferência TR-890 · Família B",r:"CD2 → CD3",p:"Ter 05/11",pl:"Qui 31/10",dv:"+5d",s:"warn",a:"A5: antecipar janela intermodal (auto-resolve na política)"},
+  {m:"Expedite EX-12 · Família A",r:"CD3 → B2B MG",p:"80 {un} · hoje",pl:"—",dv:"fora do plano",s:"warn",a:"Re-otimizar CD2/CD3 ({svc} B2B MG 94,1%)"},
+  {m:"Cobertura CD1 · área 3 em manutenção",r:"CD1",p:"16 dias",pl:"18 dias (SS)",dv:"−2 d",s:"block",a:"Viola POL-01 (SS 18d) → cenário de rebalanceamento"}];
+let pulseF="all";
+function renderPulse(){
+  const empty=!S.sample;$("#pulseFull").hidden=empty;$("#pulseEmpty").hidden=!empty;
+  $("#planInfo").innerHTML=empty?"Sem plano vigente · nenhum run do A4":"Plano vigente: <b>Baseline v7</b> · run A4 #R-0312 · atualizado há 2h";
+  $("#pulseGapCnt").textContent=allGaps().length;
+  if(empty){const R=readiness();
+    $("#pulseEmpty").innerHTML=`<div class="alert info"><b>Sem dados ainda.</b> O Pulse só mostra {wc}, {svc}, {cost} e {viol} depois do 1º run do A4 sobre o cadastro mínimo — nada aqui é estimado ou inventado.</div>
+     <div class="grid g4" style="margin-bottom:14px">${["{wc}","Serviço · {svc}","{cost}","{viol}"].map(l=>`<div class="card kpi"><div class="lbl">${l}</div><div class="val" style="color:var(--mute)">—</div><div class="hint">sem plano vigente</div></div>`).join("")}</div>
+     <div class="grid g21"><div class="card"><div class="row"><h2>Prontidão A4 · ${R.met}/${R.need}</h2><span class="tag ${R.state}">${R.label}</span></div>${checklistHTML(false)}</div>
+     <div class="card"><h2>Próximos passos</h2><ol style="margin:0;padding-left:18px">
+       <li>Revisar <button class="link" data-opencfg="1">Config do tenant</button> (moeda, UoM, tipos de nó, KPIs)</li>
+       <li>Completar o cadastro mínimo (checklist ao lado)</li>
+       <li>Criar o <b>Baseline</b> em <a class="link" href="#cenarios/novo">Novo cenário</a> e rodar o A4</li></ol>
+       <p class="hint">Ou <button class="link" data-ds="sample">carregar o sample demo</button> para explorar.</p></div></div>`;
+    return;}
+  $("#kpis").innerHTML=kpis.map(k=>{const mx=Math.max(...k.sp),mn=Math.min(...k.sp);return `<div class="card kpi"><div class="lbl">${k.l}</div><div class="val">${k.v}</div>
+    <div class="delta ${k.good?"up":"dn"}">${k.d}</div><div class="hint">${k.sub}</div>
+    <div class="spark" aria-hidden="true">${k.sp.map(v=>`<i style="height:${20+80*(v-mn)/((mx-mn)||1)}%"></i>`).join("")}</div>
+    ${k.viol?'<button class="link" data-pulsef="block" style="font-size:12px">ver violações ↓</button>':""}</div>`;}).join("");
+  const h=wc[$("#horiz").value],mx=50,lim=46;
+  $("#wcBars").innerHTML=`<div class="lim" style="bottom:${lim/mx*100}%" title="Teto WC {$} 46 mi"></div>`+h.v.map((v,i)=>`<div class="b" title="${h.lbl[i]}: {$} ${v} mi"><i class="${v>lim?"neg":""}" style="height:${v/mx*100}%"></i></div>`).join("");
+  $("#wcAxis").innerHTML=h.lbl.map(l=>`<span>${l}</span>`).join("");
+  $("#pulseRows").innerHTML=pulse.filter(p=>pulseF==="all"||p.s===pulseF).map(p=>`<tr><td>${esc(p.m)}</td><td>${esc(p.r)}</td><td>${esc(p.p)}</td><td>${esc(p.pl)}</td><td>${esc(p.dv)}</td><td><span class="tag ${p.s}">${p.s}</span></td><td>${esc(p.a)}</td></tr>`).join("");
+  $$("#pulseSeg button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.f===pulseF));
+  $("#pending").innerHTML=`
+    ${queue().map(q=>`<li><span class="tag block">Finance</span><div><b>${esc(q.nome)}</b> — investimento ${fmtMi(q.inv)} &gt; alçada ${fmtMi(alcada())}<br><span class="hint">Requer aprovação Finance${q.status==="stale"?" · cenário stale, re-rodar antes":""}</span><br><button class="link" data-openscn="${q.id}">Abrir pacote de decisão</button> · <button class="link" data-lensact="finance">Fila de alçada</button></div></li>`).join("")}
+    <li><span class="tag warn">Supply</span><div><b>Stress supply Q1</b> — {svc} B2B MG 93,4% (política ≥95%)<br><button class="link" data-openscn="SCN-0151">Ver trade-off</button></div></li>
+    <li><span class="tag info">Cadastro</span><div><b>${allGaps().length} gap(s)</b> no cadastro travam o A4 em cenários novos<br><a class="link" href="#cadastro/rede" data-filter="gaps">Revisar gaps</a></div></li>`;
+}
+
+/* ---------------- VISÕES ---------------- */
+let lens="supply";
+const LENS={
+  sales:{t:"Sales — demanda, filiais e crescimento",
+    act:{label:"＋ Novo cenário de demanda",hint:"Dita a premissa de demanda/crescimento → Cenários · Novo cenário (wizard v0.2).",
+      empty:"Sem histórico de vendas ainda. Dá para ditar a premissa, mas o A4 só roda com o cadastro mínimo."},
+    cards:[["Demanda próximos 3m","182 mil {un}","+4,2% a/a · Família A puxa"],["Filiais ativas","2 + 1 em cenário","Ribeirão (nova) ≈ Campinas"],["Cenários de crescimento","2","1 stale · 1 draft"]],
+    main:`<h2>Demanda por filial ({un}/mês)</h2><table><thead><tr><th>Nó</th><th>Família</th><th>Últ. 3m</th><th>Forecast 3m</th><th>Tendência</th></tr></thead><tbody>
+      <tr><td>Filial Campinas</td><td>Família A</td><td>8.900</td><td>9.300</td><td class="up">▲ 4%</td></tr>
+      <tr><td>Filial Campinas</td><td>Família B</td><td>310</td><td>300</td><td class="dn">▼ 3%</td></tr>
+      <tr><td>Filial Ribeirão (cenário)</td><td>Família A</td><td>—</td><td>6.200 (curva âncora)</td><td>rampa 6m</td></tr>
+      <tr><td>CD2 → B2B MG</td><td>Família A</td><td>14.100</td><td>14.800</td><td class="up">▲ 5%</td></tr></tbody></table>
+      <p class="row" style="margin-top:10px"><a class="btn primary sm" href="2026-10-30-ibp-agentic-ux-wire-happy-path-v0.2.html">＋ Ditar cenário de crescimento</a></p>`,
+    cross:[["Estoque/serviço impactados (Supply)","Abrir Ribeirão leva CD1 a 94% de capacidade em M+7 e {svc} projetado 95,2% (no limite)."],["Caixa (Finance)","Investimento {$} 3,4 mi exige alçada Finance (&gt;{$}2mi)."]]},
+  supply:{t:"Supply — rede, capacidade, gaps, rotas e contratos",
+    act:{label:"Registrar gap de capacidade",hint:"Vira PremiseCard type=Gap ligado a um nó; aparece em Cadastro · Rede e bloqueia o A4 nesse nó.",
+      empty:"Sem nós cadastrados. Cadastre o primeiro nó para medir capacidade e registrar gaps."},
+    cards:[["Ocupação média de capacidade ({cap})","78%","CD1 91% em nov (manutenção)"],["Gaps de rede",()=>String(allGaps().filter(g=>g.key==="rede").length),"bloqueiam A4 em cenários novos"],["Contratos em risco","1","CT-101 take-or-pay −300 {un}"]],
+    main:`<h2>Capacidade por nó</h2>${[["CD1 Jundiaí",91,"12.000 {capun}"],["CD2 Contagem",74,"8.500 {capun}"],["CD3 Uberlândia",62,"6.000 {capun}"],["Filial Campinas",68,"900 {capun}"]].map(n=>`<div style="margin:8px 0"><div class="row"><span>${n[0]}</span><span class="sp"></span><span class="hint">${n[1]}% de ${n[2]}</span></div><div class="meter"><i style="width:${n[1]}%;background:${n[1]>85?"var(--warn)":"var(--acc)"}"></i></div></div>`).join("")}
+      <div class="row" style="margin-top:6px"><span class="tag gap">gap</span> Filial Ribeirão sem capacidade <a class="link" href="#cadastro/rede" data-filter="gaps">corrigir no cadastro</a></div>
+      <h2 style="margin-top:16px">Rotas & contratos críticos</h2><ul class="clean">
+      <li><span class="tag warn">janela</span> R-02 CD1→Ribeirão 06h–12h · lead 2d</li><li><span class="tag block">contrato</span> CT-101 Fornecedor Alfa · take-or-pay 9.000 {un}/mês · PC-551 atrasado</li><li><span class="tag info">custo</span> R-03 intermodal CD2→CD3 18% mais barato que rodoviário</li></ul>`,
+    cross:[["Vendas relevantes ao plano (Sales)","B2B MG +5% no forecast pressiona CD2; Campinas Família B −3% libera capacidade."],["Caixa (Finance)","Antecipar compra CT-101 consome {$} 0,8 mi de WC; {wcp} ainda 41d (≤45)."]]},
+  finance:{t:"Finance — caixa, investimento, alçadas e drivers de P&L",
+    act:{label:"Fila de alçada",hint:"Decisões acima da alçada (POL-04): aprovar ou escalar, com porquê (DecisionEvent).",
+      empty:"Sem cenários nem política de alçada ainda. A fila enche quando um cenário passar da alçada."},
+    cards:[["{wc}","{$} 41,8 mi","{wcp} proxy 39d · teto 45d"],["Investimentos em cenário","{$} 3,4 mi","1 acima da alçada"],["Decisões na sua alçada",()=>String(queue().length),"fila de alçada Finance"]],
+    main:`<h2>Drivers de caixa e P&L (próx. 6m)</h2><table><thead><tr><th>Driver</th><th>Baseline</th><th>Abrir filial Y</th><th>Stress supply</th></tr></thead><tbody>
+      <tr><td>Estoque médio ({$} mi)</td><td>41,8</td><td>45,2</td><td>42,9</td></tr><tr><td>Capex</td><td>0</td><td>3,4</td><td>0</td></tr>
+      <tr><td>Custo de servir ({$}/{un})</td><td>63</td><td>66</td><td>71</td></tr><tr><td>Margem bruta incremental ({$} mi/ano)</td><td>—</td><td>+5,1</td><td>−1,7</td></tr>
+      <tr><td>Penalidade contratual ({$} mil)</td><td>0</td><td>0</td><td>380</td></tr></tbody></table>
+      <div class="alert warn" style="margin-top:12px"><b>Requer aprovação Finance (&gt;{$}2mi)</b> — Abrir filial Y · {$} 3,4 mi. <button class="btn sm" data-openscn="SCN-0145">Abrir pacote de decisão</button></div>`,
+    cross:[["Premissas de volume (Sales)","Curva Ribeirão = Campinas × 0,7 com rampa 6m (âncora H-01)."],["Custo de servir (Supply)","Rota R-02 adiciona {$} 71/{un}; R-04 via CD3 é alternativa ({$} 63/{un})."]]}
+};
+function renderLens(){
+  $$("#lensSeg button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.lens===lens));
+  const L=LENS[lens],node=$("#vNode").value,fam=$("#vFam").value;
+  const qn=queue().length,act=`<div class="card lensAct" role="region" aria-label="Ação da lente ${lens}"><button class="btn primary" data-lensact="${lens}">${L.act.label}${lens==="finance"?` <span class="tag" style="background:#fff">${qn}</span>`:""}</button><span class="hint" style="flex:1">${L.act.hint}</span></div>`;
+  if(!S.sample){$("#lensBody").innerHTML=`<h2>${L.t}</h2>${act}<div class="card"><div class="empty"><b>Sem dados para esta lente ainda.</b><div class="hint">${L.act.empty}</div>
+     ${lens==="supply"&&!ENT.rede.rows.length?'<button class="btn" data-ckgo="rede" data-cknew="1">＋ Primeiro nó</button>':'<a class="btn" href="#cadastro">Ir para Cadastro</a>'}</div></div>`;return;}
+  $("#lensBody").innerHTML=act+`<h2>${L.t}${node||fam?` <span class="tag">filtro: ${esc([node,fam].filter(Boolean).join(" · "))}</span>`:""}</h2>
+   <div class="grid g3" style="margin-bottom:14px">${L.cards.map(c=>`<div class="card kpi"><div class="lbl">${c[0]}</div><div class="val">${typeof c[1]==="function"?c[1]():c[1]}</div><div class="hint">${c[2]}</div></div>`).join("")}</div>
+   <div class="grid g21"><div class="card">${L.main}</div>
+    <div class="card cross" aria-label="Contexto cruzado"><h3>Contexto cruzado</h3>${L.cross.map(c=>`<div style="margin-bottom:12px"><b>${c[0]}</b><div class="hint">${c[1]}</div></div>`).join("")}
+     <p class="hint">Mesmo dado, mesma versão do plano (Baseline v7). Mudar de lente não muda números.</p></div></div>`;
+}
+
+/* ---------------- DRAWER ---------------- */
+let lastFocus=null;
+function openDrawer(title,body,foot){lastFocus=document.activeElement;$("#drawerTitle").textContent=title;$("#drawerBody").innerHTML=body;$("#drawerFoot").innerHTML=foot||"";
+  $("#drawer").classList.add("show");$("#drawer").setAttribute("aria-hidden","false");$("#scrim").classList.add("show");
+  setTimeout(()=>{const f=$("#drawerBody input,#drawerBody select,#drawerBody textarea")||$("#drawerClose");f.focus();},30);}
+function closeDrawer(){if(!$("#drawer").classList.contains("show"))return;$("#drawer").classList.remove("show");$("#drawer").setAttribute("aria-hidden","true");$("#scrim").classList.remove("show");lastFocus&&document.contains(lastFocus)&&lastFocus.focus();}
+$("#drawerClose").onclick=closeDrawer;$("#scrim").onclick=closeDrawer;
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape")closeDrawer();
+  if(e.key==="Tab"&&$("#drawer").classList.contains("show")){const f=$$("#drawer button:not(:disabled),#drawer input,#drawer select,#drawer textarea,#drawer a[href]");if(!f.length)return;
+    if(e.shiftKey&&document.activeElement===f[0]){e.preventDefault();f[f.length-1].focus();}else if(!e.shiftKey&&document.activeElement===f[f.length-1]){e.preventDefault();f[0].focus();}}
+  if(e.key==="Enter"&&e.target.matches("tr.clk")){e.target.click();}
+});
+
+/* ---------------- ROUTER + EVENTS ---------------- */
+function route(){
+  const [area,sub]=(location.hash.slice(1)||"pulse").split("/");const a=["cadastro","pulse","visoes","cenarios"].includes(area)?area:"pulse";
+  $$("section.area").forEach(s=>s.classList.toggle("active",s.id==="area-"+a));
+  $$("nav.side a[data-area]").forEach(l=>l.toggleAttribute("aria-current",false));
+  const cur=$(`nav.side a[data-area="${a}"]`);cur.setAttribute("aria-current","page");
+  if(a==="cadastro"){if(sub&&ENT[sub])curTab=sub;renderCad();}
+  if(a==="visoes"){if(sub&&LENS[sub])lens=sub;renderLens();}
+  if(a==="pulse")renderPulse();
+  if(a==="cenarios"){renderScn();if(sub==="novo"){const b=$("#newFlowBox");b.classList.add("hl");b.focus();setTimeout(()=>b.classList.remove("hl"),1600);}}
+  document.title=T("Domain Rewire · IBP — "+cur.textContent.trim()+" (wire v0.3.1)");
+  closeDrawer();
+}
+window.addEventListener("hashchange",route);
+function goNew(){if(location.hash==="#cenarios/novo")route();else location.hash="#cenarios/novo";}
+document.addEventListener("click",e=>{
+  const t=e.target.closest("[data-tab],[data-edit],tr.clk,[data-goto],[data-openscn],[data-pulsef],[data-filter],#cadNew,[data-cmp],#scnSeg button,#pulseSeg button,#lensSeg button,[data-new],[data-lensact],[data-ds],[data-opencfg],#openCfg,[data-ckgo],[data-gapres]");
+  if(!t)return;
+  if(t.dataset.ds){loadData(t.dataset.ds);return;}
+  if(t.id==="openCfg"||t.dataset.opencfg){openCfg();return;}
+  if(t.dataset.new){openEntity(curTab,null);return;}
+  if(t.dataset.lensact){const k=t.dataset.lensact;if(k==="sales"){goNew();}else if(k==="supply")openGapForm();else openQueue();return;}
+  if(t.dataset.ckgo){const k=t.dataset.ckgo;if(k==="cenarios-novo"){goNew();return;}curTab=k;cadOnlyGaps=false;cadFilter="";
+    if(location.hash!=="#cadastro/"+k)location.hash="#cadastro/"+k;else renderCad();if(t.dataset.cknew)setTimeout(()=>openEntity(k,null),60);return;}
+  if(t.dataset.gapres){const g=capGaps.find(x=>x.id===t.dataset.gapres);if(g){g.open=false;renderCad();toast(g.id+" resolvido");}return;}
+  if(t.dataset.filter==="gaps"){cadOnlyGaps=true;cadFilter="";}
+  if(t.dataset.tab){curTab=t.dataset.tab;cadFilter="";cadOnlyGaps=false;history.replaceState(null,"","#cadastro/"+curTab);renderCad();$("#tab-"+curTab).focus();return;}
+  if(t.id==="cadNew"){openEntity(curTab,null);return;}
+  if(t.dataset.cmp){e.stopPropagation();const id=t.dataset.cmp;if(t.checked){if(cmp.size>=3){t.checked=false;toast("Máx. 3 cenários no cockpit — desmarque um");return;}cmp.add(id);}else cmp.delete(id);renderScn();return;}
+  if(t.dataset.edit){e.stopPropagation();openEntity(curTab,t.dataset.edit);return;}
+  if(t.matches("tr.clk[data-id]")){openEntity(curTab,t.dataset.id);return;}
+  if(t.matches("tr.clk[data-scn]")){openScn(t.dataset.scn);return;}
+  if(t.dataset.goto){closeDrawer();curTab=t.dataset.goto;cadOnlyGaps=false;location.hash="#cadastro/"+curTab;renderCad();setTimeout(()=>openEntity(curTab,t.dataset.id),50);return;}
+  if(t.dataset.openscn){openScn(t.dataset.openscn);return;}
+  if(t.dataset.pulsef){pulseF=t.dataset.pulsef;renderPulse();$("#pulseRows").scrollIntoView({behavior:"smooth",block:"center"});return;}
+  if(t.closest("#scnSeg")){scnFilter=t.dataset.f;$$("#scnSeg button").forEach(b=>b.setAttribute("aria-pressed",b===t));renderScn();return;}
+  if(t.closest("#pulseSeg")){pulseF=t.dataset.f;renderPulse();return;}
+  if(t.closest("#lensSeg")){lens=t.dataset.lens;history.replaceState(null,"","#visoes/"+lens);renderLens();return;}
+});
+document.addEventListener("input",e=>{if(e.target.id==="cadSearch"){cadFilter=e.target.value;const pos=e.target.selectionStart;renderCad();const s=$("#cadSearch");s.focus();s.setSelectionRange(pos,pos);}});
+document.addEventListener("change",e=>{if(e.target.dataset&&e.target.dataset.supplyext){TC.supplyExt=e.target.checked;renderReady();toast("Contrato de fornecedor "+(TC.supplyExt?"exigido":"não exigido")+" para o A4");return;}if(e.target.id==="onlyGaps"){cadOnlyGaps=e.target.checked;renderCad();}if(e.target.id==="horiz")renderPulse();if(e.target.id==="vNode"||e.target.id==="vFam")renderLens();});
+$("#cadTabs").addEventListener("keydown",e=>{if(!["ArrowRight","ArrowLeft"].includes(e.key))return;const k=Object.keys(ENT),i=k.indexOf(curTab);curTab=k[(i+(e.key==="ArrowRight"?1:k.length-1))%k.length];
+  cadFilter="";cadOnlyGaps=false;history.replaceState(null,"","#cadastro/"+curTab);renderCad();$("#tab-"+curTab).focus();});
+$("#cmpBtn").onclick=()=>{const names=[...cmp].map(id=>scen.find(s=>s.id===id).nome);toast("Cockpit: comparando "+names.join(" × ")+" (tela 5 do wizard v0.2)");};
+$("#toggleEmbed").onclick=()=>{const w=$("#embedWrap"),open=w.hidden;w.hidden=!open;$("#toggleEmbed").setAttribute("aria-expanded",open);
+  const f=w.querySelector("iframe");if(open&&!f.src)f.src=f.dataset.src;$("#toggleEmbed").textContent=open?"Fechar pré-visualização":"Pré-visualizar embutido";};
+/* ---------------- DADOS: sample demo × tenant vazio ---------------- */
+const clone=o=>JSON.parse(JSON.stringify(o));
+const S={sample:true};
+const SAMPLE={rows:Object.fromEntries(Object.entries(ENT).map(([k,e])=>[k,clone(e.rows)])),scen:clone(scen),pulse:clone(pulse)};
+function rebuildNodeFilter(){$("#vNode").innerHTML='<option value="">Toda a rede</option>'+ENT.rede.rows.map(r=>`<option>${esc(r.nome)}</option>`).join("");}
+function renderCtx(){$("#ctxTenant").textContent=TC.tenant;
+  const by={};ENT.rede.rows.filter(r=>r.status!=="arquivado").forEach(r=>by[r.tipo]=(by[r.tipo]||0)+1);
+  $("#ctxNet").textContent=Object.keys(by).length?"Rede: "+Object.entries(by).map(([k,v])=>v+" "+k).join(" + "):"Rede vazia";
+  $("#ctxCfg").textContent=TC.currency+" · "+TC.uom;
+  $("#demoBanner").hidden=!S.sample;$("#demoBanner").textContent="Demo: vertical "+TC.vertical+" · sample BR";$("#emptyBanner").hidden=S.sample;
+  $$("#dataSeg button").forEach(b=>b.setAttribute("aria-pressed",(b.dataset.ds==="sample")===S.sample));}
+function loadData(mode){S.sample=mode==="sample";
+  for(const k of Object.keys(ENT))ENT[k].rows=S.sample?clone(SAMPLE.rows[k]):[];
+  scen.splice(0,scen.length,...(S.sample?clone(SAMPLE.scen):[]));pulse.splice(0,pulse.length,...(S.sample?clone(SAMPLE.pulse):[]));
+  capGaps=[];decisions=[];cmp.clear();scnFilter="";cadOnlyGaps=false;cadFilter="";
+  rebuildNodeFilter();renderCtx();route();renderReady();
+  toast(S.sample?"Sample demo carregado (vertical genérica · sample BR)":"Tenant vazio: cadastro 0% — comece pela Config do tenant e pelo Cadastro");}
+
+/* ---------------- CONFIG DO TENANT ---------------- */
+function cfgJSON(c){return JSON.stringify({currency:c.currency,uom_default:c.uom,capacity:{noun:c.capNoun,uom:c.capUom},node_types:c.nodeTypes.map(l=>({key:l.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g,"_"),label:l})),
+  kpi_aliases:{service:c.kpi.svc,wc:c.kpi.wc,wc_proxy:c.kpi.wcp,cost:c.kpi.cost,violations:c.kpi.viol},supply_external_in_scope:c.supplyExt,vertical_label:c.vertical},null,2);}
+function openCfg(){const w=clone(TC);
+  const opt=(arr,v,lab)=>arr.map(o=>`<option value="${esc(o)}" ${o===v?"selected":""}>${esc(lab?lab(o):o)}</option>`).join("");
+  const body=`<p class="hint">Tudo que é vertical vira config — a UI lê daqui (copy, formatos, tipos, KPIs). Sugestão p/ eng: <code>tenants.config jsonb</code>.</p>
+   <fieldset class="f"><legend>Tenant</legend><div class="kv">
+     <div class="fld"><label for="c-tenant">Nome do tenant</label><input class="f" id="c-tenant" value="${esc(w.tenant)}"></div>
+     <div class="fld"><label for="c-vert">Rótulo da vertical</label><input class="f" id="c-vert" value="${esc(w.vertical)}"></div></div></fieldset>
+   <fieldset class="f"><legend>Formatos</legend><div class="kv">
+     <div class="fld"><label for="c-cur">Moeda-base</label><select class="f" id="c-cur">${opt(Object.keys(CUR),w.currency,k=>CUR[k].name+" · "+CUR[k].sym)}</select><div class="hint">Só formata; não converte valores (sem câmbio na V0).</div></div>
+     <div class="fld"><label for="c-uom">UoM default</label><select class="f" id="c-uom">${opt(UOMS,w.uom)}</select></div></div></fieldset>
+   <fieldset class="f"><legend>Capacidade de nó</legend><div class="kv">
+     <div class="fld"><label for="c-capn">Substantivo (o que se mede)</label><input class="f" id="c-capn" list="capnList" value="${esc(w.capNoun)}"><datalist id="capnList"><option>armazenagem</option><option>processamento</option><option>produção</option><option>tancagem</option><option>expedição</option></datalist></div>
+     <div class="fld"><label for="c-capu">Unidade de capacidade</label><select class="f" id="c-capu">${opt(CAPUOMS,w.capUom)}</select></div></div>
+     <div class="hint">O kind do A4 é sempre <code>capacidade</code>; o substantivo é só rótulo do tenant.</div></fieldset>
+   <fieldset class="f"><legend>Tipos de nó</legend><div class="chips" id="c-types" aria-live="polite"></div>
+     <div class="row"><input class="f" id="c-newtype" style="flex:1;width:auto" placeholder="ex.: Hub, Loja, Armazém de terceiro" aria-label="Novo tipo de nó"><button class="btn sm" id="c-addtype" type="button">＋ Adicionar</button></div>
+     <div class="err" id="e-types"></div></fieldset>
+   <fieldset class="f"><legend>Rótulos de KPI (aliases do tenant)</legend><div class="kv">
+     <div class="fld"><label for="c-svc">Serviço</label><input class="f" id="c-svc" value="${esc(w.kpi.svc)}"></div>
+     <div class="fld"><label for="c-wc">Working capital</label><input class="f" id="c-wc" value="${esc(w.kpi.wc)}"></div>
+     <div class="fld"><label for="c-wcp">Proxy de WC (dias)</label><input class="f" id="c-wcp" value="${esc(w.kpi.wcp)}"></div>
+     <div class="fld"><label for="c-cost">Custo</label><input class="f" id="c-cost" value="${esc(w.kpi.cost)}"></div>
+     <div class="fld"><label for="c-viol">Violações</label><input class="f" id="c-viol" value="${esc(w.kpi.viol)}"></div></div>
+     <div class="hint">Demo mapeia OTIF/DSI como aliases; outro tenant pode usar “Fill rate”, “DIO”, “Nível de serviço”…</div><div class="err" id="e-kpi"></div></fieldset>
+   <fieldset class="f"><legend>Escopo</legend><label><input type="checkbox" id="c-ext" ${w.supplyExt?"checked":""}> Supply externo (compra de terceiros) no escopo — exige ≥1 contrato p/ o A4</label></fieldset>
+   <fieldset class="f"><legend>Dados do tenant</legend><div class="row"><button class="btn sm" data-ds="sample" type="button">Carregar sample demo</button><button class="btn sm" data-ds="empty" type="button">Simular tenant vazio</button>
+     <span class="hint">Descarta edições em memória.</span></div></fieldset>
+   <h3>tenant_config (preview p/ eng)</h3><pre class="json" id="c-json"></pre>`;
+  openDrawer("Config do tenant",body,`<button class="btn primary" id="c-save">Aplicar config</button><button class="btn" id="c-cancel">Cancelar</button><span class="sp"></span><button class="btn ghost" id="c-reset">Restaurar padrão demo</button>`);
+  const read=()=>{w.tenant=$("#c-tenant").value.trim();w.vertical=$("#c-vert").value.trim();w.currency=$("#c-cur").value;w.uom=$("#c-uom").value;w.capNoun=$("#c-capn").value.trim();w.capUom=$("#c-capu").value;
+    w.kpi={svc:$("#c-svc").value.trim(),wc:$("#c-wc").value.trim(),wcp:$("#c-wcp").value.trim(),cost:$("#c-cost").value.trim(),viol:$("#c-viol").value.trim()};w.supplyExt=$("#c-ext").checked;$("#c-json").textContent=cfgJSON(w);};
+  const chips=()=>{$("#c-types").innerHTML=w.nodeTypes.map((t,i)=>`<span class="chip">${esc(t)}<button type="button" data-rmtype="${i}" aria-label="Remover tipo ${esc(t)}">×</button></span>`).join("");
+    $$("#c-types [data-rmtype]").forEach(b=>b.onclick=()=>{if(w.nodeTypes.length<=1){$("#e-types").textContent="Mantenha ao menos 1 tipo de nó.";return;}w.nodeTypes.splice(+b.dataset.rmtype,1);$("#e-types").textContent="";chips();read();$("#c-newtype").focus();});};
+  const add=()=>{const v=$("#c-newtype").value.trim();if(!v)return;if(w.nodeTypes.some(t=>t.toLowerCase()===v.toLowerCase())){$("#e-types").textContent="Tipo já existe.";return;}w.nodeTypes.push(v);$("#c-newtype").value="";$("#e-types").textContent="";chips();read();};
+  chips();read();
+  $("#drawerBody").addEventListener("input",read);$("#drawerBody").addEventListener("change",read);
+  $("#c-addtype").onclick=add;$("#c-newtype").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();add();}};
+  $("#c-cancel").onclick=closeDrawer;
+  $("#c-reset").onclick=()=>{Object.assign(TC,clone(TC_DEFAULT));applyCfg();toast("Config padrão demo restaurada");};
+  $("#c-save").onclick=()=>{read();if(Object.values(w.kpi).some(v=>!v)||!w.capNoun||!w.tenant){$("#e-kpi").textContent="Preencha nome do tenant, substantivo de capacidade e todos os rótulos de KPI.";return;}
+    Object.assign(TC,clone(w));applyCfg();toast(T("Config aplicada · {$} · {un} · KPIs {svc}/{wcp}"));};}
+function applyCfg(){TPL.forEach((html,el)=>{el.innerHTML=html;});applyT(document.body);renderCtx();route();renderReady();}
+
+/* ---------------- SUPPLY: registrar gap de capacidade ---------------- */
+function openGapForm(){
+  if(!ENT.rede.rows.length){openDrawer("Registrar gap de capacidade",`<div class="empty"><b>Nenhum nó cadastrado.</b><div class="hint">Gap de capacidade sempre aponta para um nó (links.nodeId obrigatório).</div><button class="btn primary" data-ckgo="rede" data-cknew="1">＋ Primeiro nó</button></div>`,"");return;}
+  const nodes=ENT.rede.rows.filter(r=>r.status!=="arquivado"),id="GAP-"+String(capGaps.length+1).padStart(2,"0");
+  const body=`<p class="hint">Vira um <b>PremiseCard type=Gap</b> (status gap) ligado ao nó; bloqueia o A4 em cenários que tocam esse nó até resolver.</p>
+   <div class="fld"><label for="g-node">Nó *</label><select class="f" id="g-node"><option value="">—</option>${nodes.map(n=>`<option value="${esc(n.id)}">${esc(n.nome)} · ${esc(n.tipo)}${String(n.capacidade||"").trim()?"":" (sem capacidade)"}</option>`).join("")}</select><div class="err" id="e-gnode"></div></div>
+   <div class="fld"><label for="g-tipo">Tipo de gap *</label><select class="f" id="g-tipo"><option>Capacidade não cadastrada</option><option>Capacidade insuficiente no período</option><option>Indisponibilidade não planejada</option></select></div>
+   <div class="kv"><div class="fld"><label for="g-per">Período</label><input class="f" id="g-per" placeholder="ex.: 2026-11"></div>
+   <div class="fld"><label for="g-need">Necessidade adicional ({capun})</label><input class="f" id="g-need" inputmode="numeric" placeholder="ex.: 1.500"></div></div>
+   <div class="fld"><label for="g-why">Porquê * <span class="hint">(audit trail)</span></label><textarea class="f" id="g-why" rows="2" placeholder="ex.: manutenção estendida reduz área útil"></textarea><div class="err" id="e-gwhy"></div></div>
+   <h3>PremiseCard (preview)</h3><pre class="json" id="g-json"></pre>`;
+  openDrawer("Registrar gap de capacidade",body,`<button class="btn primary" id="g-save">Registrar gap</button><button class="btn" id="g-cancel">Cancelar</button>`);
+  const card=()=>({id,type:"Gap",fields:{kind:"capacidade",gapType:$("#g-tipo").value,period:$("#g-per").value.trim()||null,need:$("#g-need").value.trim()||null,uom:TC.capUom},status:"gap",links:{nodeId:$("#g-node").value||null},version:1,source:"edit"});
+  const upd=()=>{$("#g-json").textContent=JSON.stringify(card(),null,2);};upd();$("#drawerBody").addEventListener("input",upd);$("#drawerBody").addEventListener("change",upd);
+  $("#g-cancel").onclick=closeDrawer;
+  $("#g-save").onclick=()=>{const n=$("#g-node").value,w=$("#g-why").value.trim();$("#g-node").setAttribute("aria-invalid",!n);$("#e-gnode").textContent=n?"":"Escolha o nó (links.nodeId é obrigatório para Gap).";
+    $("#g-why").setAttribute("aria-invalid",!w);$("#e-gwhy").textContent=w?"":"Explique o porquê.";if(!n){$("#g-node").focus();return;}if(!w){$("#g-why").focus();return;}
+    capGaps.push({id,nodeId:n,tipo:$("#g-tipo").value,periodo:$("#g-per").value.trim(),need:$("#g-need").value.trim(),why:w,open:true,card:card()});
+    scen.forEach(s=>{if(s.status==="otimizado"&&s.nodes.includes(n)){s.status="stale";s.upd=today+" · agora";}});
+    closeDrawer();curTab="rede";location.hash="#cadastro/rede";renderCad();toast(id+" registrado em "+n+" · bloqueia A4 nesse nó");};}
+
+/* ---------------- FINANCE: fila de alçada (DecisionEvent) ---------------- */
+function openQueue(){const a=alcada(),q=queue();
+  const body=a==null?`<div class="empty"><b>Sem política de alçada publicada.</b><div class="hint">Cadastre uma política tipo Escalonamento com métrica “Alçada ({$} mi)”.</div><button class="btn primary" data-ckgo="politicas" data-cknew="1">＋ Política de alçada</button></div>`
+   :`<p class="hint">Alçada vigente: <b>${fmtMi(a)}</b> (política de escalonamento publicada). Aprovar = registrar + export (sem write-back). Porquê obrigatório.</p>
+   ${q.length?q.map(s=>`<div class="card" style="margin-bottom:10px"><div class="row"><b>${esc(s.nome)}</b><span class="sp"></span>${stTag(s.status)}</div>
+     <div class="hint">${s.id} · scenarioVersion ${s.sv} · investimento <b>${fmtMi(s.inv)}</b> &gt; ${fmtMi(a)} · Δ {wc} ${esc(s.wc)}</div>
+     ${s.status==="stale"?'<div class="alert warn" style="margin:8px 0">Cenário stale: re-rode o A4 antes de aprovar. Escalar continua possível.</div>':""}
+     <div class="fld" style="margin-top:8px"><label for="why-${s.id}">Porquê *</label><textarea class="f" rows="2" id="why-${s.id}"></textarea><div class="err" id="e-why-${s.id}"></div></div>
+     <div class="row"><button class="btn primary sm" data-dec="approve" data-s="${s.id}" ${s.status==="stale"?"disabled":""}>Aprovar</button><button class="btn sm" data-dec="escalate" data-s="${s.id}">Escalar</button><button class="btn ghost sm" data-openq="${s.id}">Abrir pacote de decisão</button></div></div>`).join("")
+     :'<div class="empty"><b>Fila vazia.</b><div class="hint">Nenhum cenário acima da alçada aguardando decisão.</div></div>'}
+   ${decisions.length?`<h3>Decisões registradas (DecisionEvent)</h3><pre class="json">${esc(JSON.stringify(decisions,null,2))}</pre>`:""}`;
+  openDrawer("Fila de alçada · Finance",body,"");
+  $$("#drawerBody [data-openq]").forEach(b=>b.onclick=()=>openScn(b.dataset.openq));
+  $$("#drawerBody [data-dec]").forEach(b=>b.onclick=()=>{const s=scen.find(x=>x.id===b.dataset.s),el=$("#why-"+s.id),w=el.value.trim();
+    if(!w){el.setAttribute("aria-invalid",true);$("#e-why-"+s.id).textContent="Porquê obrigatório (vai para o audit trail).";el.focus();return;}
+    const act=b.dataset.dec;decisions.push({id:"DEC-"+String(decisions.length+1).padStart(4,"0"),scenarioId:s.id,scenarioVersion:s.sv,runId:s.status==="otimizado"?"R-"+s.id.slice(4)+"-v"+s.sv:null,action:act,why:w,actor:{role:"finance",userId:null},at:new Date().toISOString(),exportRef:act==="approve"?"export/"+s.id+"-v"+s.sv+".csv":null});
+    if(act==="approve"){s.escala=null;s.aprov="aprovado Finance";}else{s.status="escalado";s.escala="Escalado · Domain owner";}
+    renderScn();if($("#area-pulse").classList.contains("active"))renderPulse();if($("#area-visoes").classList.contains("active"))renderLens();openQueue();toast((act==="approve"?"Aprovado: ":"Escalado: ")+s.nome);});}
+
+/* ---------------- INIT ---------------- */
+$$("[data-tpl]").forEach(el=>TPL.set(el,el.innerHTML));
+new MutationObserver(ms=>ms.forEach(m=>{if(m.type==="childList")m.addedNodes.forEach(applyT);else if(m.type==="characterData")applyT(m.target);})).observe(document.body,{childList:true,subtree:true,characterData:true});
+rebuildNodeFilter();renderCtx();route();renderReady();applyT(document.body);
+})();
+</script>
+</body>
+</html>

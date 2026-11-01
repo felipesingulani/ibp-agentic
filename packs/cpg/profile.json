@@ -1,0 +1,78 @@
+{
+  "profile_id": "cpg",
+  "name": "Bens de consumo (CPG)",
+  "sim": false,
+  "labels": {
+    "node": "CD",
+    "capacity": "posições-pallet",
+    "route": "Rota",
+    "sku": "SKU",
+    "contract": "Contrato co-packer",
+    "capacity_uom": "posições-pallet"
+  },
+  "uom": "cx",
+  "node_types": [
+    "CD",
+    "Fábrica",
+    "Distribuidor"
+  ],
+  "kpi_labels": {
+    "svc": "OTIF",
+    "wcp": "DSI",
+    "wc": "Working capital",
+    "cost": "Custo de servir",
+    "viol": "Violações de política"
+  },
+  "policy_kinds": {
+    "working_capital": [
+      "working_capital",
+      "capital_de_giro",
+      "wc"
+    ],
+    "inventory": [
+      "inventory",
+      "estoque",
+      "stock",
+      "cobertura"
+    ],
+    "service": [
+      "service",
+      "servico",
+      "service_level",
+      "otif"
+    ],
+    "alcada": [
+      "alcada",
+      "alcada_finance"
+    ]
+  },
+  "alcada": {
+    "defaultLimitMi": 2,
+    "name": "Alçada Finance investimento"
+  },
+  "agents": {
+    "A1": {
+      "enabled": true
+    },
+    "A2": {
+      "enabled": true
+    },
+    "A3": {
+      "enabled": true
+    },
+    "A4": {
+      "enabled": true,
+      "solver": "cbc"
+    },
+    "A5": {
+      "enabled": true
+    },
+    "A6": {
+      "enabled": false
+    },
+    "A7": {
+      "enabled": false,
+      "mode": "state_machine_only"
+    }
+  }
+}

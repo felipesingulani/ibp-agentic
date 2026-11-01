@@ -1,0 +1,41 @@
+{
+  "name": "ibp-agentic",
+  "version": "0.0.1",
+  "private": true,
+  "description": "IBP Agentic / Domain Rewire OS — W0 foundation (cadastro/master data only)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "migrate": "tsx src/db/migrate.ts",
+    "seed": "tsx src/db/seed.ts",
+    "seed:demo-alcada": "tsx src/db/seed-demo-alcada.ts",
+    "seed:dom-fixture": "tsx scripts/seed-dom-fixture.ts",
+    "seed:a1-fixture": "tsx scripts/seed-a1-fixture.ts",
+    "dev": "tsx watch src/http/server.ts",
+    "start": "tsx src/http/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test 'test/**/*.test.ts'",
+    "gate": "for d in src db test contracts solver packs; do bash harness/scripts/w2-grep-gate.sh $d || exit 1; done",
+    "gate:w1": "echo \"w1-grep-gate.sh = histórico (W1c); W2 abriu /scenarios e /ditado — use npm run gate\"",
+    "index:check": "test -f INDEX.md && test -f AGENTS.md",
+    "gate:w0": "echo \"w0-grep-gate.sh = histórico (W0); W1c/W2 abriram solver CBC e rotas do wizard — use npm run gate\"",
+    "audit:sales-history-period": "tsx scripts/audit-sales-history-period.ts"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "express": "5.3.0",
+    "pg": "8.23.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "@types/node": "22.20.5",
+    "@types/pg": "8.23.1",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}
