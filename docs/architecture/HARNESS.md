@@ -32,7 +32,7 @@ CI (`.github/workflows/ci.yml`): Node 22 (o glob de `npm test` é expandido ness
 
 `harness/pins.json` lista path + md5 (32 hex, bytes do arquivo, igual `md5sum`):
 
-- `public/index.html` — UI pinada `2e1fdb610bc2467b8efd16c624333908` (A7 plug; não mudar a UI para “passar” o pin)
+- `public/index.html` — UI pinada `41d290c95ab3862600148e0b7ec2630f` (W6 live; não mudar a UI para “passar” o pin)
 - `contracts/*.schema.json` — schemas de contrato
 - `contracts/v0-postgres-cadastro.sql` — SQL baseline
 - `docs/architecture/A4-SOLVER-WORKER-CONTRACT.md` — contrato do worker A4
@@ -90,7 +90,7 @@ O `smoke_md5` vai na linha de cima (`smoke_md5 <hex>`), não no lugar do checkli
 Exemplo do formato (SHA do `main` de partida deste branch + md5 pinado da UI — ilustra os dois campos, não é o DoD deste arquivo):
 
 ```
-2bf1f7557b60297d183549e55ad1b38b78a7c982 2e1fdb610bc2467b8efd16c624333908
+2bf1f7557b60297d183549e55ad1b38b78a7c982 41d290c95ab3862600148e0b7ec2630f
 ```
 
 O md5 **deste** arquivo não é escrito dentro dele (a linha mudaria o digest). Conferir o blob commitado com:

@@ -4,7 +4,7 @@
 
 Contrato: `docs/architecture/HARNESS.md`. O CI em `.github/workflows/ci.yml` roda o L0 em push/PR: typecheck, `npm run gate` (`harness/scripts/w2-grep-gate.sh`), `npm run index:check`, `npm run harness:pins`, `npm test` (Postgres).
 
-- L1 trava o md5 da UI (`public/index.html`, `2e1fdb61…`), dos schemas, do SQL baseline e do contrato do worker A4.
+- L1 trava o md5 da UI (`public/index.html`, `41d290c9…`, W6 live), dos schemas, do SQL baseline e do contrato do worker A4.
 - L2 é smoke só GET (S1–S8). Não é passo do CI.
 - L3 lê os `QA-ACCEPTANCE*.md` e imprime SHA + md5. Checkbox aberto não falha o L0.
 - L4 (Playwright, Pact, Neon branch/PR, LLM judge) não entra nesta V0.

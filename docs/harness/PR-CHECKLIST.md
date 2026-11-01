@@ -6,7 +6,7 @@ Contrato: `docs/architecture/HARNESS.md`.
 
 - [ ] `npm run harness:l0` green (typecheck, gate, INDEX, pins, `npm test`) — ou os cinco passos iguais no CI
 - [ ] Se um arquivo de `harness/pins.json` mudou: md5 atualizado no mesmo PR; schema, SQL ou contrato A4 com review do Arquiteto
-- [ ] UI `public/index.html` continua no pin `2e1fdb61…`, salvo task que o PO tenha autorizado a mexer na UI
+- [ ] UI `public/index.html` continua no pin `41d290c9…` (W6 live), salvo task que o PO tenha autorizado a mexer na UI
 - [ ] Sem Playwright, Pact, branch Neon por PR ou LLM judge (L4 — fora do V0)
 - [ ] Sem secrets commitados
 

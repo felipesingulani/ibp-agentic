@@ -1,7 +1,7 @@
 {
   "version": 0,
   "pins": [
-    { "path": "public/index.html", "md5": "2e1fdb610bc2467b8efd16c624333908" },
+    { "path": "public/index.html", "md5": "41d290c95ab3862600148e0b7ec2630f" },
     { "path": "contracts/a4-reason.schema.json", "md5": "830a405e13b3b520a7402634d17563a7" },
     { "path": "contracts/a4-run-summary.schema.json", "md5": "49a16f71a217bb8fb2b09b84254a4ff4" },
     { "path": "contracts/a7-orchestration.schema.json", "md5": "4424f06d846ce89abe29db55d8c56c5d" },
