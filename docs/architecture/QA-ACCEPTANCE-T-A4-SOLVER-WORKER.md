@@ -1,7 +1,7 @@
 # QA aceitação — T-A4-SOLVER-WORKER (worker HTTP + `A4_SOLVER_URL`)
 
 Status: **READY Qualidade · 2026-10-31** · task **T-A4-SOLVER-WORKER** · base `A4-SOLVER-WORKER-CONTRACT.md` (md5 `96cbdce7…`) · PO cravou **A**.
-> Smoke = pós DoD eng Devi + publish worker/envs Deivid. Fixture: tenant `qa-a1-*` / `qa-a4-*` (nunca E0 `e5cf…`). UI md5 pré-eng = `2e1fdb61…` (A7 plug) — deve permanecer **igual**.
+> Smoke = pós DoD eng Devi + publish worker/envs Deivid. Fixture: tenant `qa-a1-*` / `qa-a4-*` (nunca E0 `e5cf…`). UI md5 pré-eng era `2e1fdb61…` (A7 plug). Pin vigente = `41d290c9…` (W6 live, smoke GREEN).
 
 ## Cravos (PO — CRAVADO 2026-10-31)
 1. Worker HTTP Python+CBC: `GET /health` · `POST /v1/solve` (= JSON `cbc_solve.py`).
@@ -13,7 +13,7 @@ Status: **READY Qualidade · 2026-10-31** · task **T-A4-SOLVER-WORKER** · base
 - [ ] **M1 Health worker** — `GET ${A4_SOLVER_URL}/health` → **200** `{ "ok": true }` (sem auth).
 - [ ] **M2 Solve prod** — `POST /api/a4-runs` em cenário com modelo válido no tenant QA → run termina **`feasible|partial|optimal`** (status run/`outcome` conforme API atual); **não** `failed` com `spawn python3 ENOENT`.
 - [ ] **M3 Preflight down** — com `A4_SOLVER_URL` set e worker inacessível (ou secret errado no path documentado): `POST /api/a4-runs` → **503** `{ error.code: "solver_unavailable" }` · **não** cria run (sem INSERT orphan).
-- [ ] **M4 Regressão + anti-escopo** — UI `public/index.html` md5 **igual** pré-eng (`2e1fdb61…`). `POST /api/a7/evaluate` (tenant A7 on) ainda 200 schema `a7.orch.v1` (sem regressão). A1 paths / Pulse readiness green amostral. Zero LLM no worker. E0 intocado.
+- [ ] **M4 Regressão + anti-escopo** — UI `public/index.html` md5 **igual** ao pin vigente (`41d290c9…`, W6 live). `POST /api/a7/evaluate` (tenant A7 on) ainda 200 schema `a7.orch.v1` (sem regressão). A1 paths / Pulse readiness green amostral. Zero LLM no worker. E0 intocado.
 
 ## High
 - [ ] **H1 Auth worker** — `POST /v1/solve` sem secret / secret errado → **401** (direto no worker, se URL pública conhecida).
