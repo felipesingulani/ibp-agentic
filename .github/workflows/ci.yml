@@ -1,0 +1,45 @@
+# L0 — docs/architecture/HARNESS.md
+# push/PR: typecheck, gate, INDEX, pins md5, npm test (Postgres 16).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  l0:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ibp
+          POSTGRES_PASSWORD: ibp_dev_only
+          POSTGRES_DB: ibp_v0
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ibp -d ibp_v0"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MIGRATION_DATABASE_URL: postgres://ibp:ibp_dev_only@localhost:5432/ibp_v0
+      DATABASE_URL: postgres://ibp_app:change_me_dev_only@localhost:5432/ibp_v0
+      APP_DB_USER: ibp_app
+      APP_DB_PASSWORD: change_me_dev_only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: A4 CBC local (mesmo pin da image do worker)
+        run: python3 -m venv solver/.venv && solver/.venv/bin/pip install --disable-pip-version-check 'ortools==9.15.6755'
+      - run: npm run typecheck
+      - run: npm run gate
+      - run: npm run index:check
+      - run: npm run harness:pins
+      - run: npm test

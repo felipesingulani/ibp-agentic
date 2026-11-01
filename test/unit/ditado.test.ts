@@ -6,8 +6,14 @@ import { DitadoService, DitadoUnavailable, ditadoCacheKey, httpDitadoLlmFromEnv,
 const ctx = { tenantId: "t1", nodes: [{ stable_id: "11111111-1111-4111-8111-111111111111", code: "CD3", name: "CD", node_type: null }] };
 
 test("timeout → DitadoUnavailable(timeout)", async () => {
-  const s = new DitadoService({ extract: (_t, _c, signal) => new Promise((_r, rej) => signal.addEventListener("abort", () => rej(signal.reason))) }, { timeoutMs: 30 });
-  await assert.rejects(s.extract("x", ctx), (e) => e instanceof DitadoUnavailable && e.reason === "timeout");
+  // AbortSignal.timeout é unref: sem outro handle, o node:test trata o loop como vazio e cancela o teste.
+  const keep = setInterval(() => {}, 1000);
+  try {
+    const s = new DitadoService({ extract: (_t, _c, signal) => new Promise((_r, rej) => signal.addEventListener("abort", () => rej(signal.reason))) }, { timeoutMs: 30 });
+    await assert.rejects(s.extract("x", ctx), (e) => e instanceof DitadoUnavailable && e.reason === "timeout");
+  } finally {
+    clearInterval(keep);
+  }
 });
 
 test("daily cap → budget_cap; cache hit does not count", async () => {

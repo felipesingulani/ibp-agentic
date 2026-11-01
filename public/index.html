@@ -3260,7 +3260,9 @@ let jrLastErr=null,jrBlobs=[];
 const jrStTag=s=>{const [l,c]=JR_ST_PT[s]||[s,""];return `<span class="tag ${c}" data-status="${esc(s)}">${esc(l)}</span>`;};
 const jrVal=k=>k.value==null?"—":["svc","cost","wc"].includes(k.key)?T(fmtKpi(k)):jrFmtKpi(k);
 /* W6: invalid_reference do land = UMA mensagem neutra p/ qualquer recusa (não diz se o tenant existe) */
-const jrErrMsg=e=>e.error==="invalid_reference"&&e.details&&e.details.field==="landTenantId"?"landTenantId recusado — use um tenant em que seu e-mail seja Admin.":e.error==="forbidden_role"?JR_ERR_PT.forbidden_role+" Ator atual: "+JR_ROLE[jrActor()]+".":(JR_ERR_PT[e.error]||e.error);
+const jrErrMsg=e=>e.error==="invalid_reference"&&e.details&&e.details.field==="landTenantId"?"landTenantId recusado — use um tenant em que seu e-mail seja Admin.":e.error==="forbidden_role"?jrForbidMsg(e)+" Ator atual: "+JR_ROLE[jrActor()]+".":(JR_ERR_PT[e.error]||e.error);
+/* T-W6-UI: 403 forbidden_role {required} → "requer A ou B" a partir do corpo (fallback JR_LAND_ROLES); mesma copy do wire p/ [admin,domain_owner] */
+const jrForbidMsg=e=>{const q=(e.details&&Array.isArray(e.details.required)&&e.details.required.length?e.details.required:JR_LAND_ROLES).map(r=>JR_ROLE[r]||r);return "Seu papel não pode dar land — requer "+(q.length>1?q.slice(0,-1).join(", ")+" ou "+q[q.length-1]:q[0])+".";};
 function jrErrHTML(){if(!jrLastErr)return "";const e=jrLastErr,m=jrErrMsg(e),extra=e.details&&e.details.missing?": "+e.details.missing.join(", "):"";
   return `<div class="alert warn" id="jrErr" role="alert" data-error="${esc(e.error)}" style="margin-bottom:12px"><b>${esc(m+extra)}</b> <code>${e.status} ${esc(e.error)}</code></div>`;}
 function jrLabBanner(){const L=jrLab();return `<div class="alert info" id="jrLabBanner" style="margin:8px 0">Tenant lab: <b>${esc(L.slug)}</b> · <code>${esc(L.id)}</code> · RLS: só as journeys deste lab. Troque “Sample demo / Tenant vazio” no topo para outro lab.
@@ -3940,7 +3942,7 @@ function renderReadyLive(){
     $("#readyMeter").setAttribute("aria-valuenow",R.pct);$("#readyMeter").setAttribute("aria-valuetext",R.pct+"% · "+R.label);
     $("#readyBar").style.width=R.pct+"%";$("#readyBar").style.background=R.state==="block"?"var(--gap)":R.state==="warn"?"var(--warn)":"var(--ok)";
     $("#readyList").innerHTML=R.items.map(i=>`<li data-key="${esc(i.key)}"><span class="tag ${!i.required?"":i.status==="ok"?"ok":"gap"}">${esc(i.required?i.status:"n/a")}</span><div style="flex:1"><b>${esc(i.label)}</b><div class="hint">${esc(i.rule)}${i.by&&i.by.length?" · atendido por "+i.by.slice(0,4).map(esc).join(", "):""}</div></div>${i.required&&i.status!=="ok"?`<a class="btn sm" href="#cadastro/${LV_ENT2TAB[i.entity]||"politicas"}">Ir para ${esc(i.entity)}</a>`:""}</li>`).join("");
-    $("#readyWarns").innerHTML=(R.warnings||[]).map(w=>`<div class="alert warn" data-warn="${esc(w.kind)}" style="margin-top:6px"><b>${esc(w.label)}</b>${w.by&&w.by.length?" · "+w.by.map(esc).join(", "):""}${w.why?`<div class="hint">${esc(w.why)}</div>`:""}</div>`).join("");
+    $("#readyWarns").innerHTML=(R.warnings||[]).map(w=>w.kind==="policy_kind_unknown"?lvKindWarnHTML(w,"readyKindWarnLive"):`<div class="alert warn" data-warn="${esc(w.kind)}" style="margin-top:6px"><b>${esc(w.label)}</b>${w.by&&w.by.length?" · "+w.by.map(esc).join(", "):""}${w.why?`<div class="hint">${esc(w.why)}</div>`:""}</div>`).join("");
     $("#readyGaps").innerHTML=(R.warnings||[]).length?"Ver avisos ao lado (live).":"Sem avisos live. (scope.supply_external_in_scope = "+esc(String(R.scope&&R.scope.supply_external_in_scope))+")";
   },e=>{liveGateSet(false,"erro a4-readiness");$("#readyState").className="tag block";$("#readyState").textContent="erro live";$("#readyList").innerHTML=`<li>${lvErrHTML(e,"readyLiveErr")}</li>`;$("#readyWarns").innerHTML="";});}
 
@@ -4052,7 +4054,7 @@ async function lvOpenForm(path,id,preset){
     let res;try{res=isNew?await lvWrite("POST","/api/"+path,Object.assign(c.payload,{why:w}),$("#entPub")):await lvWrite("PATCH","/api/"+path+"/"+encodeURIComponent(sid),Object.assign(c.payload,{why:w}),$("#entPub"));}catch(e){return;}
     const d=res.data||{},nsid=d.stable_id||d.id,warn=(res.warnings||[]).map(x=>x.code||x.kind||x.error||JSON.stringify(x)).join(", ");
     let msg=(isNew?"Publicado ":"Nova versão ")+(d.code||d.name||nsid)+" v"+(d.version||1)+" · live";
-    if(warn)msg="⚠ "+warn+" — salvo, confira o kind · "+msg;
+    if(warn)msg=lvKindToast(res.warnings,warn)+" · "+msg;
     if(res.packSwitched)setTimeout(()=>toastLive("packSwitched",{to:typeof res.packSwitched==="string"?res.packSwitched:(res.packSwitched.to||"generic")}),900);
     if(preset&&preset._replaces){try{await lvWrite("DELETE","/api/policies/"+encodeURIComponent(await lvCurId("policies",preset._replaces))+"?why="+encodeURIComponent("Aposentada: substituída por "+nsid+" · "+w),{why:"Aposentada: substituída por "+nsid+" · "+w});msg+=" · antiga aposentada";}catch(e){toast("Nova criada ("+nsid+"), mas aposentar a antiga falhou: "+e.code);lvAfterWrite();return;}}
     closeDrawer();toast(msg);lvAfterWrite();
@@ -4177,6 +4179,31 @@ renderCad=function(){renderCadLive();lvCadDecorate();};   /* P2: barra de escrit
 renderReady=function(){mockReady();renderReadyLive();};   /* mock roda p/ coach/nav (gate mock); card de prontidão = live */
 window.addEventListener("hashchange",()=>{LV.cache={};},true);   /* navegação = releitura */
 window.IBP_LIVE_ON=true;document.title=document.title+" · LIVE";
+/* ---------------- T-W6-UI · warn de kind / papel no Land (2026-10-31 · executor Didi p/ review Deivid · contrato W6-LAND-HARDEN-KIND-WARN-CONTRACT.md) ----------------
+   Mock (wire 0.3.9/Task 12) já tinha: 403 forbidden_role no Land (ator demo), steps_out_of_order, warnings policy_kind_unknown em API.policies/prontidão mock.
+   Sob ?live=1 faltava: (a) prontidão live mostrava o aviso genérico (sem código / sem "não bloqueia"); (b) POST/PATCH /api/policies live só citava o código no toast;
+   (c) Cadastro › Políticas live sem destaque das políticas fora do vocabulário. Este bloco só LÊ (GET /api/a4-readiness · GET /api/policies, via lget/cache) — sem escrita nova, sem rota nova.
+   Fonte do aviso = servidor (readiness.warnings[kind=policy_kind_unknown].by = stable_ids; POST/PATCH body.warnings[code=policy_kind_unknown]). Nunca bloqueia nada.
+   Journey/Land segue MOCK sob a flag (fora do WIRE-LIVE P1/P2): o 403 forbidden_role live não é exercitado aqui — a copy usa details.required quando vier. */
+function lvKindWarnHTML(w,idn){const by=w.by||[];
+  return `<div class="alert warn" id="${esc(idn)}" role="status" data-warn="policy_kind_unknown" data-code="policy_kind_unknown" style="margin-top:6px">⚠ <b>${esc(w.label||"Política com kind fora do vocabulário")}</b>${by.length?" — "+by.map(id=>`<a class="link" href="#cadastro/politicas" data-kindby="${esc(id)}">${esc(id)}</a>`).join(", "):""}
+    <div class="hint">${esc(w.why||POL_KIND_WHY)} · salvo mesmo assim (aviso, não bloqueia o A4) · <span class="tag warn">policy_kind_unknown</span>${by.length>1?" · "+by.length+" políticas":""}</div></div>`;}
+function lvKindToast(ws,fallback){const k=(ws||[]).filter(x=>x&&x.code==="policy_kind_unknown");
+  return k.length?"⚠ kind "+k.map(x=>x.kind).join(", ")+" fora do vocabulário (policy_kind_unknown) — salvo, não alimenta A4":"⚠ "+fallback+" — salvo, confira o kind";}
+LV.kind={by:[],at:null};
+function lvKindDecorate(){if(curTab!=="politicas"||!$("#area-cadastro").classList.contains("active"))return;
+  Promise.all([lget("/api/a4-readiness"),lget("/api/policies")]).then(([rb,pb])=>{if(curTab!=="politicas")return;
+    const w=((rb.data&&rb.data.warnings)||[]).find(x=>x.kind==="policy_kind_unknown"),by=w?w.by||[]:[];LV.kind={by,at:new Date().toISOString()};
+    const old=document.getElementById("polKindWarnLive");if(old)old.remove();
+    const main=document.getElementById("cadLiveMain");if(!main)return;
+    if(w)main.insertAdjacentHTML("beforebegin",lvKindWarnHTML(w,"polKindWarnLive"));
+    const ids=new Set((pb.data||[]).filter(r=>by.includes(r.stable_id)||by.includes(r.id)).map(r=>String(r.id)));
+    let tries=0;const tag=()=>{const trs=[...document.querySelectorAll('#cadLiveMain tr[data-liveid]')];if(!trs.length&&tries++<12){setTimeout(tag,250);return;}
+      trs.forEach(tr=>{if(!ids.has(tr.dataset.liveid)||tr.querySelector("[data-kindwarn]"))return;const td=tr.querySelector("td");
+        if(td)td.insertAdjacentHTML("beforeend",` <span class="tag warn" data-kindwarn="${esc(tr.dataset.liveid)}" title="policy_kind_unknown · ${esc((w&&w.why)||POL_KIND_WHY)}">⚠ kind fora do vocabulário</span>`);});};
+    tag();},()=>{});}
+const lvRenderCadW6=renderCad;renderCad=function(){lvRenderCadW6();lvKindDecorate();};
+window.IBP_LIVE_KIND=LV.kind;window.IBP_LIVE_KIND_STATE=()=>LV.kind;
 /* ---------------- T-A7-PLUG · A7 live (2026-10-31 · executor Didi p/ review Deivid · contrato A7-ORCHESTRATOR-LEVE-CONTRACT.md §3–§5) ----------------
    Mesmo card #a7Orch do mock. Sob a flag: cenários = GET /api/scenarios (uuid · is_current · status ≠ archived); Avaliar/Confirmar =
    POST /api/a7/evaluate {scenarioId, commit} same-origin com x-tenant-id/x-user-id. 200|400|404|409 → mesmo shape {status, body|error} do mock,
