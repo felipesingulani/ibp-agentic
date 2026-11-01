@@ -36,7 +36,7 @@
     "package": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["premises", "violations", "options"],
+      "required": ["premises", "violations", "options", "pack"],
       "properties": {
         "premises": {
           "type": "array",
@@ -72,7 +72,8 @@
           "type": "array",
           "uniqueItems": true,
           "items": { "type": "string", "enum": ["rerun_a4_human", "fix_readiness", "open_alcada", "edit_premises", "wait"] }
-        }
+        },
+        "pack": { "$ref": "#/$defs/pack" }
       }
     },
     "basis": {
@@ -91,5 +92,59 @@
       }
     },
     "committedEventId": { "type": ["string", "null"], "format": "uuid" }
+  },
+  "$defs": {
+    "nullReason": {
+      "type": "string",
+      "enum": [
+        "no_plan", "no_price", "no_cost", "no_baseline", "no_payback_in_horizon",
+        "payback_beyond_horizon", "cost_breakdown_unavailable", "legacy_run", "no_policy"
+      ]
+    },
+    "money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "source"],
+      "properties": {
+        "value": { "type": ["number", "null"] },
+        "nullReason": { "$ref": "#/$defs/nullReason" },
+        "source": { "type": "string", "minLength": 1 }
+      }
+    },
+    "pack": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "AR-08 / AR-11 — mesmo snapshot gravado em audit_log.payload.pack.",
+      "required": [
+        "financeVersion", "formulaVersions", "runId", "scenarioVersion", "cadastroVersion",
+        "capexMi", "deltaWc", "deltaMc", "paybackMonths", "paybackWithWcMonths", "gates"
+      ],
+      "properties": {
+        "financeVersion": { "const": "sf.v0" },
+        "formulaVersions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["wc", "mc"],
+          "properties": { "wc": { "const": "wc_days_v0" }, "mc": { "const": "mc_stub_v0" } }
+        },
+        "runId": { "type": ["string", "null"] },
+        "scenarioVersion": { "type": "integer", "minimum": 1 },
+        "cadastroVersion": { "type": "integer", "minimum": 0 },
+        "capexMi": { "$ref": "#/$defs/money" },
+        "deltaWc": { "$ref": "#/$defs/money" },
+        "deltaMc": { "$ref": "#/$defs/money" },
+        "paybackMonths": { "$ref": "#/$defs/money" },
+        "paybackWithWcMonths": { "$ref": "#/$defs/money" },
+        "gates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "items"],
+          "properties": {
+            "state": { "type": "string", "enum": ["ok", "warn", "block"] },
+            "items": { "type": "array", "items": { "type": "object" } }
+          }
+        }
+      }
+    }
   }
 }

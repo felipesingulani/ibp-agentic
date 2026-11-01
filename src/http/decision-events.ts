@@ -6,6 +6,7 @@
  *        · 409 decision_closed|already_escalated|run_not_done|run_not_finished|run_stale|scenario_archived
  *        · 409 {error:{code:"cadastro_gate_block", items}} se o gate do cenário está block (AR-07)
  *        · 400 invalid_input {field:why, rule:gate_warn_min_20} se o gate está warn e why.trim().length < 20
+ *        · audit_log.payload.pack = snapshot sf.v0 (AR-08) na mesma transação, antes do INSERT da decisão
  *   GET  /api/decision-events?scenario_id=&run_id=  → {data: DecisionEvent[] (cronológico), state?} (state só com scenario_id)
  *   GET  /api/decision-events/:id                    → {data: DecisionEvent}
  * Sem write-back e sem export ainda: exportRef = null (export do plano é slice seguinte).
@@ -26,6 +27,7 @@ import { lastPremiseChangeAt } from "../a7/premise-change.js";
 import { DECISION_SELECT, type DecisionOut, decisionOut } from "../a7/event-out.js";
 import { effectiveAlcadaMi, loadAlcadaPolicy, loadScenarioImpact, requiresFinance } from "../w3/alcada.js";
 import { gateBlockBody, loadScenarioGates } from "../cadastro/gates.js";
+import { loadScenarioFinance, packAuditOf } from "../w3/finance.js";
 import { type Row, audit, ctxOf, requireUser, uuidRe } from "./common.js";
 import { HttpError } from "./errors.js";
 
@@ -97,6 +99,8 @@ export function decisionEventsRouter(pool: Pool) {
         requiresFinance: needsFinance, escalateTo: body.escalate_to ?? null,
       };
       const { next, escalateTo } = evaluateDecision(body.action, body.why, facts);
+      const fin = await loadScenarioFinance(c, String(sc.id), { runId: run?.id ?? null });
+      const pack = fin ? packAuditOf(fin, { state: gates.state, items: gates.items }) : null;
       const ins = (await c.query(
         `INSERT INTO decision_events (tenant_id, scenario_id, scenario_version, run_id, action, why, actor_user_id, actor_role)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
@@ -111,7 +115,8 @@ export function decisionEventsRouter(pool: Pool) {
       assertDecisionEvent(ev); // falha → rollback (nunca persiste evento fora do contrato)
       await audit(c, ctx, body.action, "decision_events", ev.id,
         { scenario_id: sc.id, scenario_version: sc.version, run_id: ev.runId, why: ev.why, state: next, ...v02,
-          alcada: { mode, policyRef: policy ? { id: policy.id, version: policy.version } : null, requiresFinance: needsFinance } });
+          alcada: { mode, policyRef: policy ? { id: policy.id, version: policy.version } : null, requiresFinance: needsFinance },
+          ...(pack ? { pack } : {}) });
       return { data: ev, state: { scenarioId: sc.id, scenarioVersion: sc.version, state: next, escalateTo } };
     });
     if ("blocked" in out && out.blocked) {

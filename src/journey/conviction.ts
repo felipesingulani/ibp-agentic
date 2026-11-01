@@ -18,8 +18,13 @@ export interface ConvictionPack {
   snapshot: JourneySnapshot;
 }
 
-const REASON_PT: Record<string, string> = {
+/** Rótulos pt-BR de nullReason. sf.v0 (ScenarioFinance) estende o mapa da journey — fonte única. */
+export const REASON_PT: Record<string, string> = {
   no_plan: "sem plano — rode o A4", no_data: "sem dado", not_computed_v0: "não calculado na V0",
+  no_price: "falta preço unitário", no_cost: "falta custo unitário",
+  no_baseline: "sem plano vigente para comparar", no_payback_in_horizon: "não se paga no horizonte",
+  payback_beyond_horizon: "acima do horizonte", cost_breakdown_unavailable: "quebra de custo indisponível",
+  legacy_run: "run legado sem volume por SKU", no_policy: "sem política de DSI",
 };
 const ROLE_PT: Record<string, string> = { domain_owner: "Dono do domínio", sales: "Vendas", supply: "Supply", finance: "Finanças", admin: "Admin" };
 const BASIS_PT: Record<string, string> = { approved: "plano aprovado", latest_run: "último run (não aprovado)", none: "sem plano" };

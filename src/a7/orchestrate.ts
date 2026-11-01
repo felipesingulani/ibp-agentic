@@ -5,13 +5,17 @@
  *
  * Veredito (ordem fixa, §4; 404/archived/a7_disabled são tratados antes, na rota):
  *   await_inputs   ← sem run feasible|partial na versão corrente · runStale · readiness.state=block · exception block source=readiness
+ *                    · gates.state=block (AR-11, code cadastro_gate_block)
  *   escalate_human ← requiresFinance · exception block (qualquer fonte restante) · run partial · reason warn|block · decisionState=escalated
+ *                    · ΔMC null (finance_incomplete) ou ΔMC ≤ 0 (no_margin) — só no caminho que seria auto
  *   auto_policy    ← decisionState=pending ∧ run feasible ∧ ¬stale ∧ ¬requiresFinance ∧ 0 block ∧ 0 reasons warn|block
+ *                    ∧ gates.state ≠ block ∧ deltaMc > 0 (AR-11; capex ≤ alçada já está em ¬requiresFinance)
  *   Fallback (decisionState=approved sem nenhuma condição acima): escalate_human com code `decision_closed` — fail-closed,
  *   nunca auto sem pending (§4.5); commit nesse estado → 409 decision_closed (rota). Ver T-A7-LEVE-EVIDENCE.md §Ambiguidades.
  */
 import type { PulseException } from "../w3/exceptions.js";
 import type { AlcadaMode } from "../w3/alcada.js";
+import type { GateState } from "../cadastro/gates.js";
 import type { DecisionState, EscalateTarget, RunFacts } from "./decision.js";
 
 export const ORCH_SCHEMA = "a7.orch.v1" as const;
@@ -23,8 +27,8 @@ export type ProvAgent = "A1" | "A2" | "A3" | "A5" | "A6";
 export type ProvSeverity = "info" | "warn" | "block";
 export interface Provocation { agent: ProvAgent; code: string; severity: ProvSeverity; detail: Record<string, unknown> & { id?: string | null } }
 
-export type AwaitCode = "no_run" | "run_stale" | "readiness_block" | "readiness_exception";
-export type EscalateCode = "requires_finance" | "block_exception" | "run_partial" | "run_reasons" | "already_escalated" | "decision_closed";
+export type AwaitCode = "no_run" | "run_stale" | "readiness_block" | "readiness_exception" | "cadastro_gate_block";
+export type EscalateCode = "requires_finance" | "block_exception" | "run_partial" | "run_reasons" | "already_escalated" | "decision_closed" | "finance_incomplete" | "no_margin";
 export type VerdictCode = AwaitCode | EscalateCode | "clean";
 
 export interface CardFacts { id: string; type: string; status: string; version: number; fields: unknown; createdAt?: string }
@@ -45,6 +49,10 @@ export interface OrchFacts {
   decisionState: DecisionState;
   escalatedTo: EscalateTarget | null;
   cards: CardFacts[];
+  /** AR-11. Ausente no tipo antigo não existe: block tira auto_policy. */
+  gatesState: GateState;
+  /** ΔMC em mi. null = não calculado (finance_incomplete). ≤ 0 = no_margin. */
+  deltaMc: number | null;
 }
 
 /** §4: lista de buildExceptions (snapshot W3) filtrada ao cenário + readiness/alcada globais (scenarioId null) que bloqueiam. */
@@ -63,6 +71,7 @@ export function decideVerdict(f: OrchFacts): { verdict: Verdict; code: VerdictCo
   if (f.run && f.runStale) wait.push("run_stale");
   if (f.readinessState === "block") wait.push("readiness_block");
   if (f.exceptions.some((e) => e.severity === "block" && e.source === "readiness")) wait.push("readiness_exception");
+  if (f.gatesState === "block") wait.push("cadastro_gate_block");
   if (wait.length) return { verdict: "await_inputs", code: wait[0], reasons: wait };
 
   const esc: EscalateCode[] = [];
@@ -73,7 +82,11 @@ export function decideVerdict(f: OrchFacts): { verdict: Verdict; code: VerdictCo
   if (f.decisionState === "escalated") esc.push("already_escalated");
   if (esc.length) return { verdict: "escalate_human", code: esc[0], reasons: esc };
 
-  if (f.decisionState === "pending" && f.run!.dbStatus === "feasible") return { verdict: "auto_policy", code: "clean", reasons: ["clean"] };
+  if (f.decisionState === "pending" && f.run!.dbStatus === "feasible") {
+    if (typeof f.deltaMc !== "number") return { verdict: "escalate_human", code: "finance_incomplete", reasons: ["finance_incomplete"] };
+    if (f.deltaMc <= 0) return { verdict: "escalate_human", code: "no_margin", reasons: ["no_margin"] };
+    return { verdict: "auto_policy", code: "clean", reasons: ["clean"] };
+  }
   // approved (ou run em status inesperado): nunca auto fora de pending (§4.5) → humano (fail-closed)
   return { verdict: "escalate_human", code: "decision_closed", reasons: ["decision_closed"] };
 }
@@ -133,7 +146,9 @@ export function buildPackage(f: OrchFacts, v: { verdict: Verdict; reasons: Verdi
     .map((e) => ({ id: e.id, source: e.source, severity: e.severity as "block" | "warn", summary: e.summary }));
   const on = new Set<OrchOption>();
   if (v.verdict === "await_inputs" && (v.reasons.includes("no_run") || v.reasons.includes("run_stale"))) on.add("rerun_a4_human");
-  if (v.verdict === "await_inputs" && (v.reasons.includes("readiness_block") || v.reasons.includes("readiness_exception"))) on.add("fix_readiness");
+  if (v.verdict === "await_inputs" && (v.reasons.includes("readiness_block") || v.reasons.includes("readiness_exception") || v.reasons.includes("cadastro_gate_block"))) {
+    on.add("fix_readiness");
+  }
   if (f.requiresFinance) on.add("open_alcada");
   if (f.cards.some((c) => c.status === "gap") || prov.some((p) => p.agent === "A1" || (p.agent === "A2" && p.detail.source === "premise_gap"))) {
     on.add("edit_premises");

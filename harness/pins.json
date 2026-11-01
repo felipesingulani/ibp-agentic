@@ -4,12 +4,13 @@
     { "path": "public/index.html", "md5": "41d290c95ab3862600148e0b7ec2630f" },
     { "path": "contracts/a4-reason.schema.json", "md5": "830a405e13b3b520a7402634d17563a7" },
     { "path": "contracts/a4-run-summary.schema.json", "md5": "49a16f71a217bb8fb2b09b84254a4ff4" },
-    { "path": "contracts/a7-orchestration.schema.json", "md5": "4424f06d846ce89abe29db55d8c56c5d" },
+    { "path": "contracts/a7-orchestration.schema.json", "md5": "cadfe9e96888ca464b2e706edbd7e7d0" },
     { "path": "contracts/alcada-queue-item.schema.json", "md5": "bd09e80afcbbde4af612ea22e82674c4" },
     { "path": "contracts/decision-event.schema.json", "md5": "0b7bd6cc2d8b15ea4892076bd3cbbeff" },
     { "path": "contracts/execution-movement.schema.json", "md5": "c38bafc1da95e76456215a3fecea4ade" },
     { "path": "contracts/plan-export.schema.json", "md5": "9359e17f05b4a4b697aa5e05a8e2cf90" },
     { "path": "contracts/premise-card.schema.json", "md5": "13af8f8f03a8b17168f334fa1ecdb214" },
+    { "path": "contracts/scenario-finance.schema.json", "md5": "1f2e9446bcbdf6cc92e4344f0252e487" },
     { "path": "contracts/v0-postgres-cadastro.sql", "md5": "927111de69633d00a49f9414eff6f57c" },
     { "path": "docs/architecture/A4-SOLVER-WORKER-CONTRACT.md", "md5": "96cbdce77c8152196731a369d7cec7b8" }
   ]

@@ -23,6 +23,13 @@ const profileSchema = z.object({
   node_types: z.array(z.string().min(1)).min(1),
   kpi_labels: z.record(z.string(), z.string()),
   policy_kinds: z.object({ working_capital: aliases, inventory: aliases, service: aliases, alcada: aliases.optional() }).strict(),
+  /** T-BIZ-WC-V0 (AR-10): DSO/DPO/horizonte/dias — config do pack, não env. */
+  finance: z.object({
+    dso_days: z.number().finite().positive(),
+    dpo_days: z.number().finite().nonnegative(),
+    horizon_months: z.number().int().positive(),
+    period_days: z.number().int().positive(),
+  }).strict(),
   alcada: z.object({ defaultLimitMi: z.number().finite().min(0), name: z.string().min(1) }).strict().optional(),
   agents: z.object(Object.fromEntries(AGENT_KEYS.map((k) => [k, z.object({
     enabled: z.boolean(),

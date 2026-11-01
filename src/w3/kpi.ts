@@ -6,7 +6,10 @@
 import type { PlanRef } from "./plan-ref.js";
 import { genericPack, getPack } from "../cadastro/packs.js";
 
-export type NullReason = "no_plan" | "no_data" | "not_computed_v0";
+export type NullReason =
+  | "no_plan" | "no_data" | "not_computed_v0"
+  | "no_price" | "no_cost" | "no_baseline" | "no_payback_in_horizon"
+  | "payback_beyond_horizon" | "cost_breakdown_unavailable" | "legacy_run" | "no_policy";
 export interface Kpi {
   key: string; label: string; value: number | null; unit: string | null; // label: string não vazia SEMPRE (PO+Deivid 2026-10-30)
   nullReason: NullReason | null; source: string; [extra: string]: unknown;
@@ -82,9 +85,14 @@ export function violKpi(s: Settings, counts: { block: number; warn: number }): K
     { breakdown: { block: counts.block, warn: counts.warn } });
 }
 
-export function wcKpi(s: Settings): Kpi {
-  return kpi(s, "wc", null, s.currency ? `${s.currency} mi` : null, "not_computed_v0",
-    "not_computed_v0 (A4 piloto: 1 período, 1 escalão, sem estoque)");
+/** WC do planRef. Sem run → no_plan. Com run → wc.total do ScenarioFinance (sf.v0), nunca not_computed_v0. */
+export function wcKpi(s: Settings, finance: { runId: string | null; wc: { total: { value: number | null; nullReason?: NullReason | null; source: string } } } | null): Kpi {
+  const unit = s.currency ? `${s.currency} mi` : null;
+  if (!finance || !finance.runId) {
+    return kpi(s, "wc", null, unit, "no_plan", finance?.wc.total.source ?? "sf.v0 wc.total");
+  }
+  const t = finance.wc.total;
+  return kpi(s, "wc", t.value, unit, (t.nullReason ?? "no_data") as NullReason, t.source);
 }
 
 export function utilKpis(s: Settings, ref: PlanRef, plan: PlanJson | null): { avg: Kpi; max: Kpi } {

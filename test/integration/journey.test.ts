@@ -100,7 +100,7 @@ test("lab vazio: snapshot sem número falso (leverage null + nullReason, latênc
   const s = (await call(A, "POST", `${J}/${run.id}/snapshot`)).json.data.snapshot;
   assert.equal(s.planRef.basis, "none");
   assert.deepEqual(s.leverage.points.map((k: any) => [k.key, k.value, k.nullReason]),
-    [["wc", null, "not_computed_v0"], ["svc", null, "no_plan"], ["expedite", null, "no_plan"], ["cost", null, "no_plan"], ["adherence", null, "no_plan"]]);
+    [["wc", null, "no_plan"], ["svc", null, "no_plan"], ["expedite", null, "no_plan"], ["cost", null, "no_plan"], ["adherence", null, "no_plan"]]);
   assert.ok(s.leverage.points.every((k: any) => typeof k.label === "string" && k.label.length > 0));
   assert.deepEqual(s.consensus.decisions, { approve: 0, escalate: 0, total: 0 });
   assert.deepEqual([s.consensus.latency.medianHours, s.consensus.latency.nullReason], [null, "no_data"]);
@@ -114,7 +114,7 @@ test("lab vazio: snapshot sem número falso (leverage null + nullReason, latênc
   const md = (await call(A, "GET", `${J}/${id}/conviction?format=md`)).text;
   assert.match(md, /Base do plano: sem plano/);
   assert.match(md, /OTIF \| — \(sem plano — rode o A4\)/);
-  assert.match(md, /Working capital \| — \(não calculado na V0\)/);
+  assert.match(md, /Working capital \| — \(sem plano — rode o A4\)/);
 });
 
 test("happy path Qualidade: lab → snapshot (plano aprovado) → steps → conviction (JSON+MD + GET) → sign-off → land cria tenant thin + pack", async () => {
@@ -133,7 +133,7 @@ test("happy path Qualidade: lab → snapshot (plano aprovado) → steps → conv
   assert.deepEqual([snap.planRef.basis, snap.planRef.runId], ["approved", a4run]);
   const pts = Object.fromEntries(snap.leverage.points.map((k: any) => [k.key, k]));
   assert.equal(pts.svc.value, 0.9);
-  assert.deepEqual([pts.wc.value, pts.wc.nullReason], [null, "not_computed_v0"]);
+  assert.deepEqual([pts.wc.value, pts.wc.nullReason], [null, "legacy_run"]);
   assert.deepEqual([pts.expedite.value, pts.expedite.nullReason], [null, "not_computed_v0"]);
   assert.deepEqual(snap.consensus.decisions, { approve: 1, escalate: 1, total: 2 });
   assert.equal(snap.consensus.latency.pairs, 1);

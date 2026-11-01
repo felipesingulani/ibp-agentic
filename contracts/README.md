@@ -10,6 +10,7 @@ Versionados em 2026-10-30 (rev. wire Didi v0.2). Stack: OR-Tools + state machine
 | `decision-event.schema.json` | Aprovar/escalar + **porquê** obrigatório (audit trail) |
 | `plan-export.schema.json` | **W7** — envelope do export do plano aprovado (`GET /api/plans/approved/export?format=json`; ajv em runtime; ver `docs/architecture/W7-PLAN-EXPORT-CONTRACT.md`) |
 | `alcada-queue-item.schema.json` | **Rascunho W3** — item da fila de alçada Finance (projeção; ver `docs/architecture/W3-PULSE-VISOES-API-CONTRACT.md`) |
+| `scenario-finance.schema.json` | **T-BIZ-WC-V0 + MARGIN** — `ScenarioFinance` `sf.v0` (WC dias de ciclo + MC/payback stub); ajv em `GET /api/scenarios/:id/finance` |
 
 Wire: `../2026-10-30-ibp-agentic-ux-wire-happy-path-v0.2.html`
 

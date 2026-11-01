@@ -5,6 +5,7 @@
  *   GET  /api/scenarios                      → cenários correntes
  *   GET  /api/scenarios/:id                  → cenário + cards (PremiseCard + extras)
  *   GET  /api/scenarios/:id/gates            → 200 {state, items, seal} (AR-07; block não vira 409)
+   GET  /api/scenarios/:id/finance[?run_id=] → 200 {data: ScenarioFinance sf.v0} (último feasible|partial da versão corrente)
  *   POST /api/scenarios/:id/premise_cards    → card (links.nodeId; Gap exige nó corrente → 400 invalid_reference)
  *   POST /api/scenarios/:id/ditado {text}    → LLM (mockável) → PremiseCard[] source=ditado; inválidos NÃO persistem
  *        502 ditado_unavailable (sem provedor/timeout/erro/teto) · 422 ditado_no_cards (nenhum cartão válido)
@@ -17,6 +18,7 @@ import { z } from "zod";
 import { type Client, type Pool, withTenant } from "../db/pool.js";
 import { computeReadiness, loadReadinessFacts } from "../domain/a4Readiness.js";
 import { loadScenarioGates } from "../cadastro/gates.js";
+import { loadScenarioFinance } from "../w3/finance.js";
 import { cardOut, insertCard, routeFields } from "../wizard/cards.js";
 import { type DitadoLlm, DitadoService, DitadoUnavailable, ditadoServiceFromEnv, validateLlmCards } from "../wizard/ditado.js";
 import { type Row, audit, ctxOf, requireUser, uuidRe } from "./common.js";
@@ -75,6 +77,20 @@ export function scenariosRouter(pool: Pool, ditado: DitadoService): Router {
     const rows = await withTenant(pool, ctxOf(res).tenantId, (c) =>
       c.query("SELECT * FROM scenarios WHERE is_current ORDER BY created_at DESC LIMIT 500").then((q) => q.rows));
     res.json({ data: rows.map(scenarioOut), count: rows.length });
+  });
+
+  r.get("/:id/finance", async (req, res) => {
+    const raw = req.query.run_id;
+    if (raw !== undefined && (typeof raw !== "string" || !uuidRe.test(raw))) {
+      throw new HttpError(400, "invalid_input", { field: "run_id" });
+    }
+    const out = await withTenant(pool, ctxOf(res).tenantId, async (c) => {
+      const sc = await currentScenario(c, req.params.id);
+      const fin = await loadScenarioFinance(c, String(sc.id), { runId: typeof raw === "string" ? raw : null });
+      if (!fin) throw new HttpError(404, "not_found", { field: raw ? "run_id" : "id" });
+      return fin;
+    });
+    res.json({ data: out });
   });
 
   r.get("/:id/gates", async (req, res) => {
