@@ -4,7 +4,7 @@
 
 **Wave atual:** W0+W0.1 fechados · **W1 em andamento** — slice 1 (0007), W1b (prontidão A4, 0008) e **W1c** (run A4 CBC: `a4_runs` 0009 + `POST/GET /api/a4-runs`) entregues; `confirmed_at` (0010) entregue · **W2 Task 6** (Wizard API, 0011) e **Task 7 / W2b** (A7 stub + `decision_events`, 0012) entregues; **Task 8 / W3** (Pulse + Visões + fila de alçada, GET only, sem migration) e **Task 9 / W3b** (Cadastro write API: packs + alçada em `tenant_settings`, 0013) entregues; **Task 10 / W4** (execution pulse write: `execution_movements` 0014 + `/api/execution/movements*` + Pulse fonte `execution`) entregue; **Task 11 / W5** (Journey D3: `journey_runs` 0015 + `/api/journey/runs*` + conviction pack JSON/MD + land thin) entregue; **Task 12 / W6** (harden land papel+link 0017, warn kind, 409 `steps_out_of_order`) entregue; **Task 13 / W7** (export do plano aprovado: `GET /api/plans/approved/export?format=json|csv`, GET only, sem migration) entregue. Shell **v0.3.9** no ar (Vercel) · wire→live P1 em curso.
 
-**Última atualização:** 2026-10-31 18:35 (Devi — T-A7-LEVE: `src/a7/orchestrate|roster|system-decision.ts`, `http/a7.ts`, `contracts/a7-orchestration.schema.json`, gate regra 12, testes + evidence; sem migration/UI) · antes: 2026-10-31 (Devi — T-A1-ENG: `wizard/curva.ts`, a1-curva tests, gate rule 11, `seed:a1-fixture`, evidence) · antes: 2026-10-30 12:40 (Deivid — DATA-MODEL sync 0012–0017/W4–W7 + data-model.html + WIRE-LIVE-P1) · antes: 2026-10-30 03:50 (Devi — Task 13 / W7: `src/plans/`, `http/plans.ts`, `contracts/plan-export.schema.json`, export JSON/CSV só do plano aprovado (409 `no_approved_plan`), papéis admin|domain_owner|finance, audit só no 200, gate regra 10) · antes: 2026-10-30 03:35 (Devi — Task 12 / W6: 0017 `journey_land_link()` definer, land 403 `forbidden_role` + link 400 uniforme, 409 `steps_out_of_order`, warnings `policy_kind_unknown` em policies/readiness) · antes: 2026-10-30 03:20 (Devi — med W5 `0016` land fn seta `app.tenant_id` do tenant novo · F-1 `paramsFrom` ← `tenant_settings.policy_kinds`) · antes: 2026-10-30 03:05 (Devi — Task 11 / W5: 0015 `journey_runs` + `journey_land_tenant()` definer, `src/journey/`, `http/journey.ts`, gate regra 9) · antes: 2026-10-30 02:55 (Devi — thin fix KPI labels: `Kpi.label` string não nula, defaults pt-BR + allowlist V0 + aliases, `{cap}` do pack/tenant; sem migration) · antes: 2026-10-30 02:55 (Devi — Task 10 / W4: 0014 `execution_movements` FORCE RLS + UPDATE só `status` + trigger void-only, `src/execution/`, `http/execution.ts`, Pulse fonte `execution` + aderência, gate regra 8) · antes: 02:42 (Devi — PO residual W3b: `seed:demo-alcada` → sample-demo alçada 2 mi) · antes: 02:40 (Devi — Task 9 / W3b: 0013, `packs/`, `src/cadastro/`, `http/cadastro.ts`, modos out_of_pack/no_policy fail-closed, gate regra 7) · antes: 02:20 (Devi — Task 8 / W3: `src/w3/`, `http/pulse|visoes|alcada.ts`, DecisionEvent v0.2 persistido no audit payload, gate regra 6) · antes: 01:52 Devi Task 7 / W2b; Deivid 02:04 bump `decision-event.schema.json` v0.2
+**Última atualização:** 2026-11-01 (harness V0: `docs/architecture/HARNESS.md`, `scripts/harness/{lib,pins,smoke,report}.ts`, `harness/pins.json`, `.github/workflows/ci.yml`, scripts `harness:l0|pins|smoke|report`; L0–L3, L4 fora) · antes: 2026-10-31 18:35 (Devi — T-A7-LEVE: `src/a7/orchestrate|roster|system-decision.ts`, `http/a7.ts`, `contracts/a7-orchestration.schema.json`, gate regra 12, testes + evidence; sem migration/UI) · antes: 2026-10-31 (Devi — T-A1-ENG: `wizard/curva.ts`, a1-curva tests, gate rule 11, `seed:a1-fixture`, evidence) · antes: 2026-10-30 12:40 (Deivid — DATA-MODEL sync 0012–0017/W4–W7 + data-model.html + WIRE-LIVE-P1) · antes: 2026-10-30 03:50 (Devi — Task 13 / W7: `src/plans/`, `http/plans.ts`, `contracts/plan-export.schema.json`, export JSON/CSV só do plano aprovado (409 `no_approved_plan`), papéis admin|domain_owner|finance, audit só no 200, gate regra 10) · antes: 2026-10-30 03:35 (Devi — Task 12 / W6: 0017 `journey_land_link()` definer, land 403 `forbidden_role` + link 400 uniforme, 409 `steps_out_of_order`, warnings `policy_kind_unknown` em policies/readiness) · antes: 2026-10-30 03:20 (Devi — med W5 `0016` land fn seta `app.tenant_id` do tenant novo · F-1 `paramsFrom` ← `tenant_settings.policy_kinds`) · antes: 2026-10-30 03:05 (Devi — Task 11 / W5: 0015 `journey_runs` + `journey_land_tenant()` definer, `src/journey/`, `http/journey.ts`, gate regra 9) · antes: 2026-10-30 02:55 (Devi — thin fix KPI labels: `Kpi.label` string não nula, defaults pt-BR + allowlist V0 + aliases, `{cap}` do pack/tenant; sem migration) · antes: 2026-10-30 02:55 (Devi — Task 10 / W4: 0014 `execution_movements` FORCE RLS + UPDATE só `status` + trigger void-only, `src/execution/`, `http/execution.ts`, Pulse fonte `execution` + aderência, gate regra 8) · antes: 02:42 (Devi — PO residual W3b: `seed:demo-alcada` → sample-demo alçada 2 mi) · antes: 02:40 (Devi — Task 9 / W3b: 0013, `packs/`, `src/cadastro/`, `http/cadastro.ts`, modos out_of_pack/no_policy fail-closed, gate regra 7) · antes: 02:20 (Devi — Task 8 / W3: `src/w3/`, `http/pulse|visoes|alcada.ts`, DecisionEvent v0.2 persistido no audit payload, gate regra 6) · antes: 01:52 Devi Task 7 / W2b; Deivid 02:04 bump `decision-event.schema.json` v0.2
 
 ---
 
@@ -15,8 +15,9 @@
 | `AGENTS.md` | Lei do repo: ALLOW/DENY W0, ordem de verdade, obrigação de ler/atualizar este INDEX |
 | `INDEX.md` | Este mapa — manter sincronizado com a árvore real |
 | `README.md` | Como subir local (compose, migrate, seed, API) |
-| `package.json` | Scripts npm (`db:up`, `migrate`, `seed`, `dev`, `test`, `gate`) |
-| `tsconfig.json` | TypeScript strict / NodeNext |
+| `package.json` | Scripts npm (`db:up`, `migrate`, `seed`, `dev`, `test`, `gate`, `harness:l0`, `harness:pins`, `harness:smoke`, `harness:report`) |
+| `tsconfig.json` | TypeScript strict / NodeNext (`src`, `test`, `scripts`) |
+| `.github/workflows/ci.yml` | CI L0 em push/PR: typecheck, gate, INDEX, pins md5, `npm test` (Postgres 16) |
 | `docker-compose.yml` | Postgres 16 local; init com `contracts/v0-postgres-cadastro.sql` |
 | `.env.example` | Variáveis obrigatórias (`DATABASE_URL`, `MIGRATION_DATABASE_URL`, …) |
 | `.gitignore` | node_modules, .env, dist, logs |
@@ -140,6 +141,7 @@ Baseline `0001` = arquivo em `contracts/v0-postgres-cadastro.sql` (aplicado via 
 | `product/2026-10-30-ibp-agentic-ux-wire-shell-v0.3.html` | Wire shell: Cadastro · Pulse/Caixa · Visões · Cenários |
 | `architecture/DOM-CADASTRO-WRITE-SEED-CHECKLIST.md` | T-DOM-CAD-PREP (Devi, 2026-10-31): inventário seed Cadastro + gaps E0 empty × E1 ready + papéis QA + passos idempotentes/reset + 3 cravos PO (docs only, sem impl) |
 | `architecture/T-A1-ENG-EVIDENCE.md` | T-A1-ENG (2026-10-31): A1 CurvaDemanda v1 API-only evidence — QA M/H → test mapping, 161/161, gate rule 11, deviations for Deivid review; + `T-A1-ENG-test.log`, `T-A1-ENG-curl-proof.log` (local) |
+| `architecture/HARNESS.md` | Contrato harness V0: L0 (typecheck+gate+INDEX+pins+test), L1 pins md5, L2 smoke GET S1–S8, L3 relatório QA + linha DoD SHA+md5; L4 (Playwright/Pact/Neon branch/LLM judge) fora |
 | `architecture/SECURITY-GUIDELINES.md` | Cópia operacional das guidelines de segurança |
 | `architecture/W1-A4-SKELETON.md` | Esqueleto W1 (A4) — ordem dos slices; slices 1–4 (stable_id, prontidão, `a4_runs`, solver) feitos |
 | `architecture/W1C-OR-TOOLS-DESIGN.md` | Desenho W1c (A4 CBC mínimo) + notas de implementação |
@@ -153,9 +155,10 @@ Baseline `0001` = arquivo em `contracts/v0-postgres-cadastro.sql` (aplicado via 
 | `architecture/W7-PLAN-EXPORT-CONTRACT.md` | Contrato Task 13 (W7, aprovado Deivid + PO 2026-10-30: só approved / JSON+CSV cru / admin+domain_owner+finance / sem rede-ERP): `GET /api/plans/approved/export?format=json\|csv` attachment, 409 `no_approved_plan`, sem migration, gate regra 10; CTA UI = thin Didi |
 | `architecture/DEPLOY-NEON-CHECKLIST.md` | Checklist deploy prep Neon + Vercel (Deivid, 2026-10-30 · prep, nada deployado): claim 72h/token, migrate 0001→0017 (owner direto), verificação NOBYPASSRLS/grants/definer 0016–0017, envs build×runtime, smoke Pulse/land/export, bloqueios Felipe, residual HEAD 405 |
 | `architecture/DATA-MODEL.md` | Modelo de dados em linguagem simples (tenancy/RLS, versionamento `stable_id`, settings, runtime, FKs, unlock, fora do V0) + ER mermaid — **sync até 0017 + contratos W4–W7** (Deivid, 2026-10-30 12:40 UTC-3): `execution_movements`, `journey_runs`, definer `journey_land_tenant`/`journey_land_link`, colunas 0013, export W7 sem migration, papéis por operação, §9 gaps backlog. Companion navegável `architecture/data-model.html` sincronizado junto |
+| `harness/README.md` | Ponte para o contrato V0 em `architecture/HARNESS.md` (L0–L3) |
 | `harness/W0-SCOPE.md` | Lock de escopo W0 |
-| `harness/PR-CHECKLIST.md` | Checklist obrigatório de PR |
-| `harness/GUARDRAILS.md` | Stop rules + gates (grep LLM/solver/cenário) |
+| `harness/PR-CHECKLIST.md` | Checklist de PR: L0/pins do harness V0 + itens históricos da foundation |
+| `harness/GUARDRAILS.md` | Stop rules; L0 no CI; gate ativo = `w2-grep-gate.sh` |
 
 ---
 
@@ -163,12 +166,22 @@ Baseline `0001` = arquivo em `contracts/v0-postgres-cadastro.sql` (aplicado via 
 
 | Path | Descrição |
 |------|-----------|
+| `pins.json` | L1: md5 golden da UI `public/index.html` (`2e1fdb61…`), schemas em `contracts/`, SQL baseline e contrato do worker A4 |
 | `scripts/w0-grep-gate.sh` | Gate W0 (histórico, `npm run gate:w0`): LLM/solver/rotas de cenário |
 | `scripts/w1-grep-gate.sh` | Gate W1c (histórico): CBC ok; LLM, Gurobi/CPLEX, `/scenarios`, `/ditado`, `/optimize` proibidos |
 | `scripts/w2-grep-gate.sh` | Gate atual (`npm run gate`): rotas do wizard só em arquivos do wizard; marcadores de chamada LLM só em `src/wizard/`; `fetch(` no backend só em `src/wizard/`; vendor LLM/Gurobi/CPLEX/optimize negados · regra 5 (Task 7): `src/a7/` + `http/decision-events.ts` sem LLM/prompt/narrativa/fetch/ditado · regra 6 (Task 8): `src/w3/` + `http/pulse|visoes|alcada*` sem LLM/narrativa/fetch e sem escrita (SQL INSERT/UPDATE/DELETE, `.post/.put/.patch/.delete(`) · regra 7 (Task 9/W3b): `src/cadastro/` + `http/cadastro*` + `packs/` sem LLM/prompt/narrativa/fetch/ditado (gate roda também em `packs/`) · regra 8 (Task 10/W4): `src/execution/` + `http/execution*` sem LLM/prompt/narrativa/fetch/ditado e sem DELETE · regra 9 (Task 11/W5): `src/journey/` + `http/journey*` sem LLM/prompt/narrativa/fetch/ditado, sem cliente de rede (node:http(s)/axios/undici) e sem DELETE · regra 10 (Task 13/W7): `src/plans/` + `http/plans*` sem LLM/prompt/narrativa/fetch/ditado/cliente de rede e sem escrita (SQL INSERT/UPDATE/DELETE, `.post/.put/.patch/.delete(`) |
 | `scripts/w2-grep-gate.sh` · rule 11 | T-A1-ENG: `src/wizard/` without INSERT/UPDATE/DELETE/TRUNCATE on `sales_history` |
 | `scripts/w2-grep-gate.sh` · rule 13 | T-A4-SOLVER-WORKER: `fetch(` liberado só em `src/a4/solve.ts` (worker A4 + preflight); resto do backend segue regra 4 |
 | `scripts/w2-grep-gate.sh` · rule 12 | T-A7-LEVE: regra 5 cobre `http/a7*.ts`; path A7 (`src/a7/` + `http/a7*`) sem `a4-runs`/INSERT|UPDATE `a4_runs`/import do solver/`executeRun`, sem Gurobi/cplex/optimize, sem cliente de rede/ERP |
+
+## `scripts/harness/` — harness V0 (L0–L3)
+
+| Path | Descrição |
+|------|-----------|
+| `lib.ts` | md5 de arquivo, carga de `harness/pins.json`, `git rev-parse HEAD` |
+| `pins.ts` | L1: confere os md5 golden (`npm run harness:pins`) |
+| `smoke.ts` | L2: smoke só GET S1–S8 — health, 401, tenant seed (me/pulse/a4-readiness), md5 da UI, `/health` do worker (`npm run harness:smoke`) |
+| `report.ts` | L3: checklists `QA-ACCEPTANCE*.md` + SHA + md5 do smoke; linha `DOD <sha> <md5>` (`npm run harness:report`) |
 
 ---
 
