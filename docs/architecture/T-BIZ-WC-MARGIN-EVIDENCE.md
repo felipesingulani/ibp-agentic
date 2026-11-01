@@ -1,7 +1,7 @@
 # T-BIZ-WC-V0 + T-BIZ-MARGIN-STUB — evidence (fatia 2 + A7 AR-11)
 
 **Date:** 2026-11-01 · **Contract:** `docs/architecture/T-BIZ-ARCH-CONTRACT.md` md5 `53222b6e4297ce65af0c3d2293c82ac3`
-**Code SHA:** SHA_PENDING
+**Code SHA:** `1624a4b3265dba5d2d222bbe8ad548c033ad64fa`
 **Scope:** AR-01..04, AR-08, AR-10, AR-11. Must M1, M4, M6, M7, M8, M9, M10 (schema `scenario-finance` only). Sem `plan.v1` / `a4-run-plan` (isso é PLAN-UI / M5). Sem migration, sem env nova, sem UI, sem ligar `A7.enabled`.
 
 ## Result
