@@ -4,6 +4,8 @@
  *        → 201 {data: DecisionEvent (contrato), state}   · 400 why_required|why_too_short|run_required|invalid_reference
  *        · 404 not_found (cenário inexistente/de outro tenant/não corrente) · 403 escalated_to_domain_owner|decision_forbidden
  *        · 409 decision_closed|already_escalated|run_not_done|run_not_finished|run_stale|scenario_archived
+ *        · 409 {error:{code:"cadastro_gate_block", items}} se o gate do cenário está block (AR-07)
+ *        · 400 invalid_input {field:why, rule:gate_warn_min_20} se o gate está warn e why.trim().length < 20
  *   GET  /api/decision-events?scenario_id=&run_id=  → {data: DecisionEvent[] (cronológico), state?} (state só com scenario_id)
  *   GET  /api/decision-events/:id                    → {data: DecisionEvent}
  * Sem write-back e sem export ainda: exportRef = null (export do plano é slice seguinte).
@@ -23,6 +25,7 @@ import {
 import { lastPremiseChangeAt } from "../a7/premise-change.js";
 import { DECISION_SELECT, type DecisionOut, decisionOut } from "../a7/event-out.js";
 import { effectiveAlcadaMi, loadAlcadaPolicy, loadScenarioImpact, requiresFinance } from "../w3/alcada.js";
+import { gateBlockBody, loadScenarioGates } from "../cadastro/gates.js";
 import { type Row, audit, ctxOf, requireUser, uuidRe } from "./common.js";
 import { HttpError } from "./errors.js";
 
@@ -75,6 +78,11 @@ export function decisionEventsRouter(pool: Pool) {
       await c.query("SELECT pg_advisory_xact_lock(hashtextextended('decision:' || $1, 0))", [body.scenario_id]);
       const sc = (await c.query("SELECT * FROM scenarios WHERE id = $1 AND is_current", [body.scenario_id])).rows[0];
       if (!sc) throw new HttpError(404, "not_found", { field: "scenario_id" });
+      const gates = await loadScenarioGates(c, String(sc.id));
+      if (gates.state === "block") return { blocked: gates.items };
+      if (gates.state === "warn" && body.why.trim().length < 20) {
+        throw new HttpError(400, "invalid_input", { field: "why", rule: "gate_warn_min_20" });
+      }
       let run: RunFacts | null = null;
       if (body.run_id) {
         run = await loadRun(c, body.run_id);
@@ -106,6 +114,10 @@ export function decisionEventsRouter(pool: Pool) {
           alcada: { mode, policyRef: policy ? { id: policy.id, version: policy.version } : null, requiresFinance: needsFinance } });
       return { data: ev, state: { scenarioId: sc.id, scenarioVersion: sc.version, state: next, escalateTo } };
     });
+    if ("blocked" in out && out.blocked) {
+      res.status(409).json(gateBlockBody(out.blocked));
+      return;
+    }
     res.status(201).json(out);
   });
 

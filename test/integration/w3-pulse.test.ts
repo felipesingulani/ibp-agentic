@@ -261,6 +261,7 @@ test("RLS cross-tenant: B nunca vê fila/exceções/eventos/planRef de A", async
   const sc = await scenario(A.tenantId);
   await card(A.tenantId, sc, "Investimento", { impactMi: 9 });
   const nB = (await q("INSERT INTO nodes (tenant_id, code, name, node_type) VALUES ($1,'NA','NA','cd') RETURNING stable_id", [A.tenantId]))[0];
+  await q("INSERT INTO node_capacity (tenant_id, node_id, capacity_t_month) VALUES ($1, $2, 10)", [A.tenantId, nB.stable_id]);
   await card(A.tenantId, sc, "Gap", {}, "gap", nB.stable_id);
   const r = await run(A.tenantId, sc, "feasible", { reasons: [{ rank: 1, kind: "custo", summary: "A only", refs: {}, severity: "warn" }], plan: { totals: { fillRate: 1 } } });
   assert.equal((await decide(ASales, { scenario_id: sc, run_id: r, action: "escalate", why: LONG })).status, 201);

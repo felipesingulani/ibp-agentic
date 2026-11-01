@@ -46,7 +46,7 @@ async function seed(who: Who) {
   await ok(who, "POST", "/api/node_capacity", { node_id: cd2.stable_id, capacity_per_period: 50 });
   await ok(who, "POST", "/api/routes", { code: "R1", origin_node_id: cd1.stable_id, dest_node_id: l1.stable_id, cost_per_unit: 2, lead_time_days: 1 });
   await ok(who, "POST", "/api/routes", { code: "R2", origin_node_id: cd2.stable_id, dest_node_id: l1.stable_id, cost_per_unit: 5, lead_time_days: 1 });
-  const s1 = await ok(who, "POST", "/api/skus", { code: "S1", name: "S1" });
+  const s1 = await ok(who, "POST", "/api/skus", { code: "S1", name: "S1", unit_cost: 1, attrs: { unit_price: 2 } });
   await ok(who, "POST", "/api/policies", { kind: "Serviço", name: "svc", body: { min_fill_rate: 0.98, max_lead_time_days: 3 } });
   await ok(who, "POST", "/api/policies", { kind: "estoque", name: "est", body: {} });
   await ok(who, "POST", "/api/sales_history", { rows: [{ node_id: l1.stable_id, sku_id: s1.stable_id, period: "2026-10", qty: 160 }] });

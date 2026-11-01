@@ -4,6 +4,7 @@
  *        403 scenario_locked (tenant_settings.confirmed_at nulo) · 409 a4_not_ready (prontidão = block)
  *   GET  /api/scenarios                      → cenários correntes
  *   GET  /api/scenarios/:id                  → cenário + cards (PremiseCard + extras)
+ *   GET  /api/scenarios/:id/gates            → 200 {state, items, seal} (AR-07; block não vira 409)
  *   POST /api/scenarios/:id/premise_cards    → card (links.nodeId; Gap exige nó corrente → 400 invalid_reference)
  *   POST /api/scenarios/:id/ditado {text}    → LLM (mockável) → PremiseCard[] source=ditado; inválidos NÃO persistem
  *        502 ditado_unavailable (sem provedor/timeout/erro/teto) · 422 ditado_no_cards (nenhum cartão válido)
@@ -15,6 +16,7 @@ import express, { type Router } from "express";
 import { z } from "zod";
 import { type Client, type Pool, withTenant } from "../db/pool.js";
 import { computeReadiness, loadReadinessFacts } from "../domain/a4Readiness.js";
+import { loadScenarioGates } from "../cadastro/gates.js";
 import { cardOut, insertCard, routeFields } from "../wizard/cards.js";
 import { type DitadoLlm, DitadoService, DitadoUnavailable, ditadoServiceFromEnv, validateLlmCards } from "../wizard/ditado.js";
 import { type Row, audit, ctxOf, requireUser, uuidRe } from "./common.js";
@@ -73,6 +75,14 @@ export function scenariosRouter(pool: Pool, ditado: DitadoService): Router {
     const rows = await withTenant(pool, ctxOf(res).tenantId, (c) =>
       c.query("SELECT * FROM scenarios WHERE is_current ORDER BY created_at DESC LIMIT 500").then((q) => q.rows));
     res.json({ data: rows.map(scenarioOut), count: rows.length });
+  });
+
+  r.get("/:id/gates", async (req, res) => {
+    const out = await withTenant(pool, ctxOf(res).tenantId, async (c) => {
+      const sc = await currentScenario(c, req.params.id);
+      return loadScenarioGates(c, String(sc.id));
+    });
+    res.json(out);
   });
 
   r.get("/:id", async (req, res) => {

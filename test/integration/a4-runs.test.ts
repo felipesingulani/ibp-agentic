@@ -50,8 +50,8 @@ async function seedNetwork(who: Who, demandScale = 1) {
   const route = (code: string, o: { stable_id: string }, d: { stable_id: string }, cost: number, lt: number) =>
     ok(who, "POST", "/api/routes", { code, origin_node_id: o.stable_id, dest_node_id: d.stable_id, cost_per_unit: cost, lead_time_days: lt });
   await route("R1", cd1, l1, 2, 1); await route("R2", cd2, l1, 5, 4); await route("R3", cd1, l2, 3, 1); await route("R4", cd2, l2, 1, 1);
-  const s1 = await ok(who, "POST", "/api/skus", { code: "S1", name: "S1" });
-  const s2 = await ok(who, "POST", "/api/skus", { code: "S2", name: "S2" });
+  const s1 = await ok(who, "POST", "/api/skus", { code: "S1", name: "S1", unit_cost: 1, attrs: { unit_price: 2 } });
+  const s2 = await ok(who, "POST", "/api/skus", { code: "S2", name: "S2", unit_cost: 1, attrs: { unit_price: 2 } });
   await ok(who, "POST", "/api/policies", { kind: "Serviço", name: "svc", body: { min_fill_rate: 0.98, max_lead_time_days: 3 } });
   await ok(who, "POST", "/api/policies", { kind: "estoque", name: "est", body: {} });
   const rows = [[l1, s1, 60], [l1, s2, 30], [l2, s1, 50], [l2, s2, 20]].map(([n, k, q]) => ({
@@ -111,6 +111,9 @@ test("happy A4 run (real CBC): queued → done/partial, top-3 reasons with capac
 
 test("feasible run: enough capacity → done/feasible; Gap card legado 'tancagem' vira capacidade", async () => {
   const tb = await seedNetwork(B, 0.5); // demanda 80 ≤ 150
+  // Gap em L1: o gate de cadastro exige capacidade no nó da premissa (AR-07). Capacidade local alta
+  // não muda o veredito feasible nem a razão do Gap (utilização fica abaixo de 95%).
+  await ok(B, "POST", "/api/node_capacity", { node_id: tb.l1.stable_id, capacity_per_period: 1000 });
   const sc = await ownerCreateScenario(B.tenantId, "SC-B");
   const gap = await call(B, "POST", "/api/premise_cards", { scenario_id: sc, card_id: "PC-1", type: "Gap", status: "gap",
     node_id: tb.l1.stable_id, fields: { kind: "tancagem", need: "tanque" }, source: "edit" });
