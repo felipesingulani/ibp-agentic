@@ -71,7 +71,7 @@ test("empty tenant: basis none, 4 KPIs null+nullReason, checklist + nextStep con
   assert.deepEqual(d.planRef, { basis: "none", scenarioId: null, scenarioVersion: null, runId: null, at: null });
   assert.equal(d.empty, true);
   assert.deepEqual(d.kpis.map((k: { key: string }) => k.key), ["svc", "cost", "viol", "wc"]);
-  assert.deepEqual(d.kpis.map((k: { nullReason: string | null }) => k.nullReason), ["no_plan", "no_plan", null, "not_computed_v0"]);
+  assert.deepEqual(d.kpis.map((k: { nullReason: string | null }) => k.nullReason), ["no_plan", "no_plan", null, "no_plan"]);
   assert.equal(d.kpis[0].value, null); assert.equal(d.kpis[1].value, null); assert.equal(d.kpis[3].value, null);
   assert.equal(d.readiness.state, "block"); assert.ok(Array.isArray(d.readiness.items));
   assert.deepEqual(d.unlock, { newScenario: false }); assert.deepEqual(d.pending, { alcada: 0, staleScenarios: 0, executionExceptions: 0 });

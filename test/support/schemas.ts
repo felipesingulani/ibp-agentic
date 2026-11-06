@@ -12,3 +12,4 @@ export const validateDecisionEvent = ajv.compile(load("decision-event.schema.jso
 export const validateAlcadaItem = ajv.compile(load("alcada-queue-item.schema.json")); // $ref decision-event via $id
 export const validateExecutionMovement = ajv.compile(load("execution-movement.schema.json")); // W4
 export const validateA7Orch = ajv.compile(load("a7-orchestration.schema.json")); // T-A7-LEVE
+export const validateScenarioFinance = ajv.compile(load("scenario-finance.schema.json")); // T-BIZ-WC-V0 + MARGIN

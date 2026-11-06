@@ -26,10 +26,11 @@
 # 13) A4 worker (T-A4-SOLVER-WORKER · A4-SOLVER-WORKER-CONTRACT.md §4): fetch( liberado SÓ em src/a4/solve.ts
 #     (POST ${A4_SOLVER_URL}/v1/solve + preflight /health). Resto do backend segue sem fetch( (regra 4).
 # 14) T-BIZ-CAD-GATES: GET /api/scenarios/:id/gates mora no router do wizard; o teste de paridade entra no ALLOW das rotas.
+# 15) T-BIZ-WC-V0: GET /api/scenarios/:id/finance mora no router do wizard; o teste entra no ALLOW das rotas.
 # Histórico: w0-grep-gate.sh (W0), w1-grep-gate.sh (W1c).
 set -euo pipefail
 ROOT="${1:-.}"
-ALLOW='^(\./)?(src/http/scenarios\.ts|src/wizard/|test/integration/wizard-api\.test\.ts|test/integration/a1-curva\.test\.ts|test/integration/cadastro-gates\.test\.ts|test/unit/ditado\.test\.ts)'
+ALLOW='^(\./)?(src/http/scenarios\.ts|src/wizard/|test/integration/wizard-api\.test\.ts|test/integration/a1-curva\.test\.ts|test/integration/cadastro-gates\.test\.ts|test/integration/scenario-finance\.test\.ts|test/unit/ditado\.test\.ts)'
 fail=0
 scan() { # $1=pattern → linhas "arquivo:linha:texto" (caminho relativo ao repo)
   grep -RInE "$1" "$ROOT" --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=docs --exclude-dir=.venv \

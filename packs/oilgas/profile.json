@@ -52,6 +52,7 @@
     "defaultLimitMi": 2,
     "name": "Alçada Finance investimento"
   },
+  "finance": { "dso_days": 45, "dpo_days": 30, "horizon_months": 24, "period_days": 30 },
   "agents": {
     "A1": {
       "enabled": true

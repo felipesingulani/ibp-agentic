@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ibp-agentic.local/schemas/scenario-finance.schema.json",
+  "title": "ScenarioFinance",
+  "description": "T-BIZ-WC-V0 + T-BIZ-MARGIN-STUB (AR-01). financeVersion sf.v0. Valores em milhões da moeda do tenant, 2 casas. null + nullReason, nunca 0 silencioso. Calculado on-read por src/w3/finance.ts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "financeVersion", "formulaVersions", "scenarioId", "scenarioVersion", "runId",
+    "cadastroVersion", "stale", "period", "periodDays", "horizonMonths",
+    "revenue", "cogs", "logisticsCost", "mc", "deltaMc", "capexMi",
+    "wc", "deltaWc", "paybackMonths", "paybackWithWcMonths", "drivers", "missing"
+  ],
+  "properties": {
+    "financeVersion": { "const": "sf.v0" },
+    "formulaVersions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wc", "mc"],
+      "properties": {
+        "wc": { "const": "wc_days_v0" },
+        "mc": { "const": "mc_stub_v0" }
+      }
+    },
+    "scenarioId": { "type": "string", "minLength": 1 },
+    "scenarioVersion": { "type": "integer", "minimum": 1 },
+    "runId": { "type": ["string", "null"] },
+    "cadastroVersion": { "type": "integer", "minimum": 0 },
+    "stale": { "type": "boolean" },
+    "period": { "type": ["string", "null"] },
+    "periodDays": {
+      "description": "Dias do mês quando period é YYYY-MM (source period). Período inválido cai no period_days do pack e expõe source default_pack.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "source"],
+      "properties": {
+        "value": { "type": "integer", "minimum": 1 },
+        "source": { "type": "string", "enum": ["period", "default_pack"] }
+      }
+    },
+    "horizonMonths": { "type": "number", "exclusiveMinimum": 0 },
+    "revenue": { "$ref": "#/$defs/money" },
+    "cogs": { "$ref": "#/$defs/money" },
+    "logisticsCost": { "$ref": "#/$defs/money" },
+    "mc": { "$ref": "#/$defs/money" },
+    "deltaMc": { "$ref": "#/$defs/money" },
+    "capexMi": { "$ref": "#/$defs/money" },
+    "wc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inventory", "receivables", "payables", "total"],
+      "properties": {
+        "inventory": { "$ref": "#/$defs/money" },
+        "receivables": { "$ref": "#/$defs/money" },
+        "payables": { "$ref": "#/$defs/money" },
+        "total": { "$ref": "#/$defs/money" }
+      }
+    },
+    "deltaWc": { "$ref": "#/$defs/money" },
+    "paybackMonths": { "$ref": "#/$defs/money" },
+    "paybackWithWcMonths": { "$ref": "#/$defs/money" },
+    "drivers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "value", "source", "ref"],
+        "properties": {
+          "key": { "type": "string", "pattern": "^(dsi|dso|dpo|unit_price:.+|unit_cost:.+)$" },
+          "value": { "type": "number" },
+          "source": { "type": "string", "enum": ["premise", "cadastro", "policy", "default_pack"] },
+          "ref": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "missing": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["entity", "stable_id", "code", "field", "cta"],
+        "properties": {
+          "entity": { "const": "sku" },
+          "stable_id": { "type": "string", "minLength": 1 },
+          "code": { "type": "string", "minLength": 1 },
+          "field": { "type": "string", "enum": ["unit_price", "unit_cost"] },
+          "cta": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "nullReason": {
+      "type": "string",
+      "enum": [
+        "no_plan", "no_price", "no_cost", "no_baseline", "no_payback_in_horizon",
+        "payback_beyond_horizon", "cost_breakdown_unavailable", "legacy_run", "no_policy"
+      ]
+    },
+    "money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "source"],
+      "properties": {
+        "value": { "type": ["number", "null"] },
+        "nullReason": { "$ref": "#/$defs/nullReason" },
+        "source": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

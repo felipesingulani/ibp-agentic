@@ -15,7 +15,7 @@ const exc = (o: Partial<PulseException> = {}): PulseException => ({ id: "x1", so
 const facts = (o: Partial<OrchFacts> = {}): OrchFacts => ({
   scenario: { id: "s1", version: 1, status: "draft" }, run: run(), latestRunStatus: "feasible", runStale: false, readinessState: "ok",
   exceptions: [], requiresFinance: false, alcadaMode: "active", impactMi: null, alcadaMi: 10, decisionState: "pending", escalatedTo: null,
-  cards: [], ...o });
+  cards: [], gatesState: "ok", deltaMc: 1, ...o });
 const rejects = (fn: () => unknown, status: number, code: string) =>
   assert.throws(fn, (e: unknown) => e instanceof HttpError && e.status === status && e.message === code, code);
 
@@ -105,6 +105,20 @@ test("pacote: premissas (≤10, Gap/Curva/Investimento primeiro), violações bl
   assert.deepEqual(orchestrate(facts()).package, { premises: [], violations: [], options: [] });
   assert.deepEqual(orchestrate(facts()).basis, { hasRun: true, runStatus: "feasible", runStale: false, requiresFinance: false,
     impactMi: null, alcadaMi: 10, decisionState: "pending", pulseExceptionsCount: 0 });
+});
+
+test("AR-11: auto_policy exige ΔMC > 0 e gate ≠ block", () => {
+  const block = decideVerdict(facts({ gatesState: "block", deltaMc: 1 }));
+  assert.equal(block.verdict, "await_inputs");
+  assert.equal(block.code, "cadastro_gate_block");
+  assert.ok(orchestrate(facts({ gatesState: "block", deltaMc: 1 })).package.options.includes("fix_readiness"));
+  const inc = decideVerdict(facts({ deltaMc: null }));
+  assert.deepEqual([inc.verdict, inc.code], ["escalate_human", "finance_incomplete"]);
+  assert.equal(decideVerdict(facts({ deltaMc: 0 })).code, "no_margin");
+  assert.equal(decideVerdict(facts({ deltaMc: -0.2 })).code, "no_margin");
+  assert.equal(decideVerdict(facts({ gatesState: "block", deltaMc: null })).code, "cadastro_gate_block");
+  assert.equal(decideVerdict(facts({ deltaMc: 0.01 })).verdict, "auto_policy");
+  assert.equal(decideVerdict(facts({ decisionState: "approved", deltaMc: null })).code, "decision_closed");
 });
 
 test("decisão system: approve aplica pré-condições de run; escalate → finance|domain_owner; approved/escalated → 409", () => {

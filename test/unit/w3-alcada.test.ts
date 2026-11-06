@@ -80,7 +80,7 @@ test("KPIs: nunca inventa (no_plan / no_data / not_computed_v0); cost = objectiv
   assert.equal(costKpi(s, ref, { objective: 300, totals: { served: 0 } }).nullReason, "no_data");
   assert.equal(costKpi({ ...s, uom: null }, ref, { objective: 1, totals: { served: 1 } }).unit, null);
   assert.equal(violKpi(s, { block: 2, warn: 1 }).value, 3);
-  assert.equal(wcKpi(s).nullReason, "not_computed_v0"); assert.equal(wcKpi(s).value, null);
+  assert.equal(wcKpi(s, null).nullReason, "no_plan"); assert.equal(wcKpi(s, null).value, null);
 });
 
 test("dedupe: mesmo kind+nodeId → maior severidade (empate: a4_run > readiness > premise_gap > alcada); ordem block>warn>info", () => {

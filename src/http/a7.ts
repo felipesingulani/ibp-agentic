@@ -19,6 +19,8 @@ import { lastPremiseChangeAt } from "../a7/premise-change.js";
 import { assertA7Enabled } from "../a7/roster.js";
 import { SYSTEM_ACTOR, evaluateSystemDecision } from "../a7/system-decision.js";
 import { effectiveAlcadaMi, loadAlcadaPolicy, loadScenarioImpact, requiresFinance } from "../w3/alcada.js";
+import { loadScenarioFinance, packAuditOf } from "../w3/finance.js";
+import { loadScenarioGates } from "../cadastro/gates.js";
 import { loadW3 } from "../w3/snapshot.js";
 import { type Ctx, type Row, audit, ctxOf } from "./common.js";
 import { HttpError } from "./errors.js";
@@ -36,12 +38,14 @@ async function loadFacts(c: Client, sc: Row) {
   const done = runs.find((r) => r.status === "feasible" || r.status === "partial");
   const run = done ? runFacts(done) : null;
   const scenario = { id: sid, version, status: String(sc.status) };
+  const gates = await loadScenarioGates(c, sid);
   const events = (await c.query(`${DECISION_SELECT} WHERE d.scenario_id = $1 AND d.scenario_version = $2 ORDER BY d.at, d.id`,
     [sid, version])).rows.map(decisionOut);
   const premiseAt = await lastPremiseChangeAt(c, sid);
   const { mode, policy } = await loadAlcadaPolicy(c);
   const imp = await loadScenarioImpact(c, sid);
   const needsFinance = requiresFinance(mode, policy, imp);
+  const fin = await loadScenarioFinance(c, sid, { runId: run?.id ?? null });
   const alcadaMi = needsFinance ? effectiveAlcadaMi(mode, policy) : (mode === "active" ? policy?.alcadaMi ?? null : null);
   const facts: OrchFacts = {
     scenario, run, latestRunStatus: runs[0] ? String(runs[0].status) : null,
@@ -51,8 +55,11 @@ async function loadFacts(c: Client, sc: Row) {
     decisionState: decisionState(events), escalatedTo: escalatedTo(events),
     cards: snap.cards.filter((k) => String(k.scenario_id) === sid).map((k) => ({
       id: String(k.id), type: String(k.type), status: String(k.status), version: Number(k.version ?? 1), fields: k.fields })),
+    gatesState: gates.state,
+    deltaMc: fin?.deltaMc.value ?? null,
   };
-  return { facts, events, premiseAt, mode, policy };
+  const pack = fin ? packAuditOf(fin, { state: gates.state, items: gates.items }) : null;
+  return { facts, events, premiseAt, mode, policy, pack };
 }
 
 export function a7Router(pool: Pool) {
@@ -68,8 +75,9 @@ export function a7Router(pool: Pool) {
       if (!sc) throw new HttpError(404, "not_found", { field: "scenarioId" });
       if (sc.status === "archived") throw new HttpError(409, "scenario_archived");
       await assertA7Enabled(c);
-      const { facts, events, premiseAt, mode, policy } = await loadFacts(c, sc);
+      const { facts, events, premiseAt, mode, policy, pack } = await loadFacts(c, sc);
       const o = orchestrate(facts);
+      const pkg = { ...o.package, pack };
       let committedEventId: string | null = null;
       if (body.commit) {
         if (facts.decisionState === "approved") throw new HttpError(409, "decision_closed", { state: "approved" });
@@ -89,13 +97,14 @@ export function a7Router(pool: Pool) {
         await audit(c, sys, action, "decision_events", ev.id, {
           scenario_id: facts.scenario.id, scenario_version: facts.scenario.version, run_id: ev.runId, why, state: next, ...v02,
           alcada: { mode, policyRef: policy ? { id: policy.id, version: policy.version } : null, requiresFinance: facts.requiresFinance },
+          ...(pack ? { pack } : {}),
           a7: { schema: ORCH_SCHEMA, verdict: o.verdict, code: o.code, reasons: o.reasons, provocations: o.provocations,
-            package: o.package, basis: o.basis, requestedBy: ctx.userId },
+            package: pkg, basis: o.basis, requestedBy: ctx.userId },
         });
         committedEventId = ev.id;
       }
       const resp = { schema: ORCH_SCHEMA, scenarioId: facts.scenario.id, scenarioVersion: facts.scenario.version, verdict: o.verdict,
-        provocations: o.provocations, package: o.package, basis: o.basis, committedEventId };
+        provocations: o.provocations, package: pkg, basis: o.basis, committedEventId };
       assertA7Orchestration(resp); // fora do contrato → 500 + rollback do commit
       return resp;
     });

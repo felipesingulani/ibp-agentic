@@ -14,6 +14,7 @@ import { type PlanRef, resolvePlanRef } from "./plan-ref.js";
 import { type Bucket, adherence, bucketize, executionExceptions } from "../execution/pulse.js";
 import { loadPlanMovements } from "../execution/store.js";
 import { type PulseException, buildExceptions, severityCounts } from "./exceptions.js";
+import { loadScenarioFinance, type ScenarioFinance } from "./finance.js";
 import {
   type Kpi, type PlanJson, type Settings, costKpi, makeKpi, svcKpi, utilKpis, violKpi, wcKpi,
 } from "./kpi.js";
@@ -29,6 +30,8 @@ export interface W3Snapshot {
   demand3p: { value: number | null; periods: string[] };
   alcada: AlcadaView; exceptions: PulseException[]; staleScenarios: number;
   execution: { movements: number; buckets: Bucket[]; flagged: number; adherence: ReturnType<typeof adherence> }; // W4
+  /** WC/MC do planRef (sf.v0). null quando não há run — KPI wc fica no_plan. */
+  finance: ScenarioFinance | null;
 }
 
 const live = (s: Row) => s.is_current && s.status !== "archived";
@@ -89,8 +92,12 @@ export async function loadW3(c: Client): Promise<W3Snapshot> {
       lastPremiseChangeAt: await lastPremiseChangeAt(c, String(s.id)) })) staleScenarios++;
   }
 
+  const finance = planRef.scenarioId
+    ? await loadScenarioFinance(c, planRef.scenarioId, { runId: planRef.runId })
+    : null;
+
   return { settings, confirmedAt, planRef, run, plan: (run?.plan ?? null) as PlanJson | null, readiness, unlock,
-    scenarios, nodes, cards, contractsCurrent, demand3p, alcada, exceptions, staleScenarios, execution };
+    scenarios, nodes, cards, contractsCurrent, demand3p, alcada, exceptions, staleScenarios, execution, finance };
 }
 
 // ---- números compartilhados (uma função cada) ----
@@ -104,7 +111,7 @@ export const adherenceKpi = (s: W3Snapshot): Kpi => makeKpi(s.settings, "adheren
 
 export function pulseKpis(s: W3Snapshot): Kpi[] {
   return [svcKpi(s.settings, s.planRef, s.plan), costKpi(s.settings, s.planRef, s.plan),
-    violKpi(s.settings, severityCounts(s.exceptions)), wcKpi(s.settings)];
+    violKpi(s.settings, severityCounts(s.exceptions)), wcKpi(s.settings, s.finance)];
 }
 const kpiByKey = (s: W3Snapshot, key: string) => pulseKpis(s).find((k) => k.key === key)!;
 

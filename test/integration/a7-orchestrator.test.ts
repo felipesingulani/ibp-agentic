@@ -43,11 +43,23 @@ const code = (p = "A7") => `${p}-${Date.now().toString(36)}-${Math.random().toSt
 const card = (tenantId: string, sc: string, type: string, fields: unknown, status = "ok", nodeId: string | null = null) =>
   q(`INSERT INTO premise_cards (tenant_id, scenario_id, card_id, type, fields, status, node_id, source)
      VALUES ($1,$2,$3,$4,$5,$6,$7,'edit') RETURNING id`, [tenantId, sc, code("PC"), type, JSON.stringify(fields), status, nodeId]).then((r) => r[0].id as string);
-async function run(tenantId: string, sc: string, status: string, o: { reasons?: unknown[]; ago?: number; version?: number } = {}) {
+async function run(tenantId: string, sc: string, status: string, o: { reasons?: unknown[]; ago?: number; version?: number; plan?: unknown } = {}) {
   return (await q(
     `INSERT INTO a4_runs (tenant_id, run_code, scenario_id, scenario_version, status, reasons, counts_by_kind, plan, started_at, finished_at)
-     VALUES ($1,$2,$3,$4,$5,$6,'{}',NULL, now() - make_interval(secs => $7), now() - make_interval(secs => $7))
-     RETURNING id`, [tenantId, code("R"), sc, o.version ?? 1, status, JSON.stringify(o.reasons ?? []), o.ago ?? 0]))[0].id as string;
+     VALUES ($1,$2,$3,$4,$5,$6,'{}',$8, now() - make_interval(secs => $7), now() - make_interval(secs => $7))
+     RETURNING id`, [tenantId, code("R"), sc, o.version ?? 1, status, JSON.stringify(o.reasons ?? []), o.ago ?? 0,
+      o.plan === undefined ? null : JSON.stringify(o.plan)]))[0].id as string;
+}
+function marginPlan(nodeId: string, skuId: string, qty: number) {
+  return { period: "2026-09", objective: 0, local: [{ nodeId, skuId, qty }], flows: [], totals: { demand: qty, served: qty, fillRate: 1 } };
+}
+/** Plano vigente com MC menor, para o cenário seguinte ter ΔMC > 0 (AR-11). */
+async function approveLowBaseline(who: Who, nodeId: string, skuId: string) {
+  const sc = await ownerCreateScenario(who.tenantId, code("BL"));
+  const rid = await run(who.tenantId, sc, "feasible", { ago: 8, plan: marginPlan(nodeId, skuId, 10000) });
+  await q(`INSERT INTO decision_events (tenant_id, scenario_id, scenario_version, run_id, action, why, actor_role)
+           VALUES ($1,$2,1,$3,'approve','baseline vigente','domain_owner')`, [who.tenantId, sc, rid]);
+  return sc;
 }
 const counts = async (tenantId: string) => (await q(
   `SELECT (SELECT count(*) FROM decision_events WHERE tenant_id = $1)::int AS de, (SELECT count(*) FROM audit_log WHERE tenant_id = $1)::int AS al`, [tenantId]))[0];
@@ -65,9 +77,9 @@ async function seedReady(who: Who) {
   const [n1, n2] = [await node("CD1"), await node("L1")];
   for (const n of [n1, n2]) await ok(who, "POST", "/api/node_capacity", { node_id: n.stable_id, capacity_per_period: 100 });
   await ok(who, "POST", "/api/routes", { code: "R1", origin_node_id: n1.stable_id, dest_node_id: n2.stable_id, cost_per_unit: 2, lead_time_days: 1 });
-  await ok(who, "POST", "/api/skus", { code: "S1", name: "S1", unit_cost: 1, attrs: { unit_price: 2 } });
-  await ok(who, "POST", "/api/policies", { kind: "capital de giro", name: "wc", body: {} });
-  return { n1, n2 };
+  const sku = await ok(who, "POST", "/api/skus", { code: "S1", name: "S1", unit_cost: 1, attrs: { unit_price: 2 } });
+  await ok(who, "POST", "/api/policies", { kind: "capital de giro", name: "wc", body: { dsi_days: 45, dso_days: 45, dpo_days: 30 } });
+  return { n1, n2, sku };
 }
 
 before(async () => {
@@ -109,7 +121,8 @@ test("M2/H4: matriz await_inputs (readiness block · sem run · failed · versã
   let o = await evalOk(B, scB);
   assert.deepEqual([o.verdict, o.package.options, o.basis.hasRun], ["await_inputs", ["fix_readiness"], true], "tenant vazio → readiness block");
 
-  await enableA7(A); await seedReady(A);
+  await enableA7(A); const ready = await seedReady(A);
+  await approveLowBaseline(A, ready.n2.stable_id, ready.sku.stable_id);
   const sc = await ownerCreateScenario(A.tenantId, code("SC"));
   o = await evalOk(A, sc);
   assert.equal(o.schema, "a7.orch.v1"); assert.equal(o.scenarioId, sc); assert.equal(o.committedEventId, null);
@@ -133,7 +146,8 @@ test("M2/H4: matriz await_inputs (readiness block · sem run · failed · versã
   assert.equal(o.verdict, "escalate_human");
   assert.ok(o.provocations.some((p: { agent: string; code: string; detail: { id: string } }) =>
     p.agent === "A5" && p.code === "policy_violation" && p.detail.id === `a4_run:${rid}:2`));
-  await run(A.tenantId, sc, "feasible", { ago: 0, reasons: [{ code: "x", severity: "info", rank: 1, summary: "info" }] });
+  await run(A.tenantId, sc, "feasible", { ago: 0, reasons: [{ code: "x", severity: "info", rank: 1, summary: "info" }],
+    plan: marginPlan(ready.n2.stable_id, ready.sku.stable_id, 20000) });
   o = await evalOk(A, sc);
   assert.deepEqual([o.verdict, o.basis.requiresFinance, o.basis.decisionState, o.package.options], ["auto_policy", false, "pending", []]);
 
@@ -150,9 +164,10 @@ test("M2/H4: matriz await_inputs (readiness block · sem run · failed · versã
 
 test("M3: commit=false não escreve; auto+commit → approve system (userId null) + audit c/ pacote; reavaliar/commit → 409 decision_closed", async () => {
   const { A } = await tenants();
-  await enableA7(A); await seedReady(A);
+  await enableA7(A); const ready = await seedReady(A);
+  await approveLowBaseline(A, ready.n2.stable_id, ready.sku.stable_id);
   const sc = await ownerCreateScenario(A.tenantId, code("SC"));
-  const rid = await run(A.tenantId, sc, "feasible", { ago: 0 });
+  const rid = await run(A.tenantId, sc, "feasible", { ago: 0, plan: marginPlan(ready.n2.stable_id, ready.sku.stable_id, 20000) });
   const c0 = await counts(A.tenantId);
   assert.equal((await evalOk(A, sc)).verdict, "auto_policy");
   assert.equal((await evalOk(A, sc, false)).committedEventId, null);

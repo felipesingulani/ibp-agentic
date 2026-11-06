@@ -17,7 +17,7 @@ test("allowlist V0 (Deivid) + board: todo key tem default pt-BR não vazio", () 
 
 test("tenant sem settings: board e visões nunca null; {cap} resolvido pelo pack generic", () => {
   assert.equal(svcKpi(bare, none, null).label, "OTIF");          // generic pack kpi_labels
-  assert.equal(wcKpi(bare).label, "Working capital");
+  assert.equal(wcKpi(bare, null).label, "Working capital");
   assert.equal(labelOf(bare, "util_avg"), "Utilização média de armazenagem");
   for (const k of ["nodes_current", "scenarios_sales", "network_gaps", "contracts_current", "contract_reasons", "volume_premises",
     "pending_alcada", "adherence", "invest_mi"] as const) {
