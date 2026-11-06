@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { effectivePolicyKinds } from "../../src/domain/policy-kinds.js";
 import { scenarioImpact } from "../../src/w3/alcada.js";
 import {
-  buildScenarioFinance, type FinanceComputeInput, type ScenarioFinance,
+  assertScenarioFinance, buildScenarioFinance, type FinanceComputeInput, type ScenarioFinance,
 } from "../../src/w3/finance.js";
 import { fmtKpi } from "../../src/journey/conviction.js";
 import type { Kpi } from "../../src/w3/kpi.js";
@@ -50,7 +50,7 @@ test("EN-01 wc_days_v0: volume×preço/custo, DSI 45, DSO 45, DPO 30, set/2026 (
   const f = buildScenarioFinance(input());
   assert.equal(f.financeVersion, "sf.v0");
   assert.deepEqual(f.formulaVersions, { wc: "wc_days_v0", mc: "mc_stub_v0" });
-  assert.equal(f.periodDays, 30);
+  assert.deepEqual(f.periodDays, { value: 30, source: "period" });
   assert.equal(f.horizonMonths, 24);
   assert.equal(money(f, "revenue").value, 1.5);
   assert.equal(money(f, "cogs").value, 0.9);
@@ -72,7 +72,7 @@ test("EN-01 wc_days_v0: volume×preço/custo, DSI 45, DSO 45, DPO 30, set/2026 (
     policies: [{ name: "POL-DSI", version: 1, kind: "estoque", body: { dsi_days: 29 } }],
     plan: { objective: 0, lines: null },
   }));
-  assert.equal(feb.periodDays, 29);
+  assert.deepEqual(feb.periodDays, { value: 29, source: "period" });
   assert.equal(feb.wc.inventory.value, 0.29); // (290_000/29)×29 = 290_000 → 0,29 mi
 });
 
@@ -153,6 +153,79 @@ test("EN-05 precedência: premissa > cadastro > política > default_pack (4 comb
   assert.equal(noDsi.wc.receivables.value, 2.25);
   assert.equal(noDsi.wc.total.nullReason, "no_policy");
   assert.equal(noDsi.drivers.some((x) => x.key === "dsi"), false);
+});
+
+test("baseline incompleto propaga o nullReason real; baseline ausente fica no_baseline", () => {
+  const absent = buildScenarioFinance(input());
+  assert.equal(absent.mc.value, 0.6);
+  assert.equal(absent.wc.total.value, 2.7);
+  assert.equal(absent.deltaMc.nullReason, "no_baseline");
+  assert.equal(absent.deltaWc.nullReason, "no_baseline");
+  assert.equal(absent.paybackMonths.nullReason, "no_baseline");
+  assert.equal(absent.paybackWithWcMonths.nullReason, "no_baseline");
+  assertScenarioFinance(absent);
+
+  const price = buildScenarioFinance(input({
+    baseline: { mc: null, wc: null, mcNullReason: "no_price", wcNullReason: "no_price" },
+  }));
+  assert.equal(price.deltaMc.value, null);
+  assert.equal(price.deltaMc.nullReason, "no_price");
+  assert.equal(price.deltaWc.nullReason, "no_price");
+  assert.equal(price.paybackMonths.nullReason, "no_price");
+  assert.equal(price.paybackWithWcMonths.nullReason, "no_price");
+  assert.notEqual(price.deltaMc.nullReason, "no_baseline");
+  assertScenarioFinance(price);
+
+  const cost = buildScenarioFinance(input({
+    baseline: { mc: null, wc: 1, mcNullReason: "no_cost" },
+  }));
+  assert.equal(cost.deltaMc.nullReason, "no_cost");
+  assert.equal(cost.deltaWc.value, 1.7);
+  assert.equal(cost.deltaWc.nullReason, undefined);
+  assertScenarioFinance(cost);
+
+  const policy = buildScenarioFinance(input({
+    premises: [{ card_id: "PC-1", version: 1, type: "Investimento", fields: { impactMi: 1.2 } }],
+    baseline: { mc: 0.5, wc: null, wcNullReason: "no_policy" },
+  }));
+  assert.equal(policy.deltaMc.value, 0.1);
+  assert.equal(policy.deltaWc.value, null);
+  assert.equal(policy.deltaWc.nullReason, "no_policy");
+  assert.equal(policy.paybackMonths.value, 12);
+  assert.equal(policy.paybackWithWcMonths.nullReason, "no_policy");
+  assert.notEqual(policy.deltaWc.nullReason, "no_baseline");
+  assertScenarioFinance(policy);
+
+  // o buraco do próprio cenário continua na frente do nullReason do baseline
+  const own = buildScenarioFinance(input({
+    skus: [sku({ unit_price: null })],
+    baseline: { mc: 0.2, wc: 1 },
+  }));
+  assert.equal(own.deltaMc.nullReason, "no_price");
+  assert.equal(own.deltaWc.nullReason, "no_price");
+});
+
+test("período inválido usa os dias do pack e source default_pack; YYYY-MM usa o mês e source period", () => {
+  const bad = buildScenarioFinance(input({
+    period: "2026-13",
+    defaults: { ...defaults, period_days: 28 },
+  }));
+  assert.deepEqual(bad.periodDays, { value: 28, source: "default_pack" });
+  // (900_000/28)×45 = 1_446_428,57 → 1,45 mi: o fallback entra na conta, não é rótulo solto
+  assert.equal(bad.wc.inventory.value, 1.45);
+  assertScenarioFinance(bad);
+
+  const blank = buildScenarioFinance(input({ period: null }));
+  assert.deepEqual(blank.periodDays, { value: 30, source: "default_pack" });
+  assertScenarioFinance(blank);
+
+  const dated = buildScenarioFinance(input({ period: "2026-09-01" }));
+  assert.deepEqual(dated.periodDays, { value: 30, source: "default_pack" });
+
+  const sep = buildScenarioFinance(input({ period: "2026-09" }));
+  assert.deepEqual(sep.periodDays, { value: 30, source: "period" });
+  assert.equal(sep.wc.inventory.value, 1.35);
+  assertScenarioFinance(sep);
 });
 
 test("rótulos sf.v0 saem do mapa único de conviction.ts", () => {

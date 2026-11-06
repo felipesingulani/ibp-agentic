@@ -29,6 +29,21 @@
 
 ## O que o módulo faz
 
-`src/w3/finance.ts` é a única conta. Volume = `served` (local + flows do run) por SKU. Preço/custo faltante zera o agregado (`null` + `no_price|no_cost` + `missing[]`), nunca soma parcial. DSI sem política → `no_policy` (sem default). DSO/DPO/horizonte/dias caem no bloco `finance` do pack. `capexMi` chama `scenarioImpact`. ΔMC/ΔWC/payback ficam `no_baseline` sem plano aprovado (`resolvePlanRef`). Run sem `local`/`flows` → `legacy_run`. Rótulos pt-BR em `journey/conviction.ts` (`REASON_PT`).
+`src/w3/finance.ts` é a única conta. Volume = `served` (local + flows do run) por SKU. Preço/custo faltante zera o agregado (`null` + `no_price|no_cost` + `missing[]`), nunca soma parcial. DSI sem política → `no_policy` (sem default). DSO/DPO/horizonte/dias caem no bloco `finance` do pack. `capexMi` chama `scenarioImpact`. ΔMC/ΔWC/payback ficam `no_baseline` só quando não há plano aprovado (`resolvePlanRef`); baseline aprovado com MC ou WC null propaga o `nullReason` desse lado. `periodDays` é `{ value, source }`: `YYYY-MM` → dias do mês (`source: period`); período inválido → `period_days` do pack (`source: default_pack`). Run sem `local`/`flows` → `legacy_run`. Rótulos pt-BR em `journey/conviction.ts` (`REASON_PT`).
 
 Pulse e Visões leem `wc.total` desse objeto. `POST /api/decision-events` grava `payload.pack` antes do INSERT. `POST /api/a7/evaluate` lê o mesmo pack: `gates.state=block` espera insumos; ΔMC null ou ≤ 0 não vira `auto_policy`. `package.pack` é o mesmo objeto do audit.
+
+## Fix ARCH RED
+
+Review de arquitetura (AR-01/AR-02) em `src/w3/finance.ts`. Contrato `T-BIZ-ARCH-CONTRACT.md` md5 `53222b6e4297ce65af0c3d2293c82ac3` inalterado. Zero migration, zero env nova. `public/index.html` md5 `41d290c95ab3862600148e0b7ec2630f`.
+
+1. **Baseline incompleto.** Plano vigente com MC ou WC `null` não responde mais `no_baseline`. `deltaMc` / `deltaWc` e o payback que depende deles propagam o `nullReason` do baseline (`no_price`, `no_cost`, `no_policy`, …). `no_baseline` só quando o baseline não existe. `loadCore` guarda o `nullReason` junto do número.
+2. **Período inválido.** Fora de `YYYY-MM`, `periodDays.value` é o `period_days` do pack e `periodDays.source` é `default_pack` (mesmo par `{ value, source }` dos outros números). Mês válido usa `source: period` — setembro continua 30, mas a origem não é o pack. O schema `contracts/scenario-finance.schema.json` passou a aceitar esse objeto (`source` enum `period|default_pack`); ajv valida a saída. Pin em `harness/pins.json` atualizado para o md5 novo (`bb2c04435a526d4364a19c13a298130d`).
+
+Testes novos:
+
+- `baseline incompleto propaga o nullReason real; baseline ausente fica no_baseline` — `test/unit/scenario-finance.test.ts`
+- `período inválido usa os dias do pack e source default_pack; YYYY-MM usa o mês e source period` — `test/unit/scenario-finance.test.ts`
+- `baseline aprovado sem DSI propaga no_policy no ΔWC; sem approve o delta é no_baseline` — `test/integration/scenario-finance.test.ts` (também cobre o fallback `2026-13` no GET, ajv)
+
+`npm run harness:l0` verde. `npm test` **227/227** (antes 224/224, +3).

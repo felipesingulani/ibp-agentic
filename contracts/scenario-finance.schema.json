@@ -28,7 +28,16 @@
     "cadastroVersion": { "type": "integer", "minimum": 0 },
     "stale": { "type": "boolean" },
     "period": { "type": ["string", "null"] },
-    "periodDays": { "type": "integer", "minimum": 1 },
+    "periodDays": {
+      "description": "Dias do mês quando period é YYYY-MM (source period). Período inválido cai no period_days do pack e expõe source default_pack.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "source"],
+      "properties": {
+        "value": { "type": "integer", "minimum": 1 },
+        "source": { "type": "string", "enum": ["period", "default_pack"] }
+      }
+    },
     "horizonMonths": { "type": "number", "exclusiveMinimum": 0 },
     "revenue": { "$ref": "#/$defs/money" },
     "cogs": { "$ref": "#/$defs/money" },

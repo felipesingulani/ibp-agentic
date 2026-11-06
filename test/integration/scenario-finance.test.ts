@@ -95,6 +95,74 @@ test("EN-06: visões finance e pulse saem de not_computed_v0; sem run → no_pla
   assert.equal(lens.cards.find((k: { key: string }) => k.key === "wc").nullReason, null);
 });
 
+test("baseline aprovado sem DSI propaga no_policy no ΔWC; sem approve o delta é no_baseline", async () => {
+  const { A } = await tenants();
+  const sku = (await q(
+    "INSERT INTO skus (tenant_id, code, name, unit_cost, attrs) VALUES ($1,'SKU-B','S',900,$2) RETURNING stable_id",
+    [A.tenantId, JSON.stringify({ unit_price: 1500 })],
+  ))[0].stable_id as string;
+  const plan = (qty: number, period = "2026-09") => ({
+    period, objective: 0, local: [{ skuId: sku, qty }], flows: [],
+  });
+  const current = await ownerCreateScenario(A.tenantId, code());
+  await q(
+    `INSERT INTO premise_cards (tenant_id, scenario_id, card_id, type, fields, status, source)
+     VALUES ($1,$2,'PC-DSI','CurvaDemanda',$3,'ok','edit')`,
+    [A.tenantId, current, JSON.stringify({ dsi_days: 45 })],
+  );
+  const currentRun = (await q(
+    `INSERT INTO a4_runs (tenant_id, run_code, scenario_id, scenario_version, status, plan, finished_at)
+     VALUES ($1,$2,$3,1,'feasible',$4, now()) RETURNING id`,
+    [A.tenantId, code(), current, JSON.stringify(plan(1000))],
+  ))[0].id as string;
+
+  const before = await get(A, `/api/scenarios/${current}/finance`);
+  assert.equal(before.status, 200, JSON.stringify(before.json));
+  assert.ok(validateScenarioFinance(before.json.data), JSON.stringify(validateScenarioFinance.errors));
+  assert.equal(before.json.data.mc.value, 0.6);
+  assert.equal(before.json.data.wc.total.value, 2.7);
+  assert.equal(before.json.data.deltaMc.nullReason, "no_baseline");
+  assert.equal(before.json.data.deltaWc.nullReason, "no_baseline");
+  assert.deepEqual(before.json.data.periodDays, { value: 30, source: "period" });
+
+  const badRun = (await q(
+    `INSERT INTO a4_runs (tenant_id, run_code, scenario_id, scenario_version, status, plan, finished_at)
+     VALUES ($1,$2,$3,1,'feasible',$4, now()) RETURNING id`,
+    [A.tenantId, code(), current, JSON.stringify(plan(1000, "2026-13"))],
+  ))[0].id as string;
+  const bad = await get(A, `/api/scenarios/${current}/finance?run_id=${badRun}`);
+  assert.equal(bad.status, 200, JSON.stringify(bad.json));
+  assert.ok(validateScenarioFinance(bad.json.data), JSON.stringify(validateScenarioFinance.errors));
+  assert.deepEqual(bad.json.data.periodDays, { value: 30, source: "default_pack" });
+
+  const baseSc = await ownerCreateScenario(A.tenantId, code());
+  const baseRun = (await q(
+    `INSERT INTO a4_runs (tenant_id, run_code, scenario_id, scenario_version, status, plan, finished_at)
+     VALUES ($1,$2,$3,1,'feasible',$4, now()) RETURNING id`,
+    [A.tenantId, code(), baseSc, JSON.stringify(plan(500))],
+  ))[0].id as string;
+  await q(
+    `INSERT INTO decision_events (tenant_id, scenario_id, scenario_version, run_id, action, why, actor_role)
+     VALUES ($1,$2,1,$3,'approve','aprovo o baseline sem DSI','domain_owner')`,
+    [A.tenantId, baseSc, baseRun],
+  );
+  const baseFin = await get(A, `/api/scenarios/${baseSc}/finance`);
+  assert.equal(baseFin.status, 200, JSON.stringify(baseFin.json));
+  assert.equal(baseFin.json.data.mc.value, 0.3);
+  assert.equal(baseFin.json.data.wc.total.value, null);
+  assert.equal(baseFin.json.data.wc.total.nullReason, "no_policy");
+
+  const after = await get(A, `/api/scenarios/${current}/finance?run_id=${currentRun}`);
+  assert.equal(after.status, 200, JSON.stringify(after.json));
+  assert.ok(validateScenarioFinance(after.json.data), JSON.stringify(validateScenarioFinance.errors));
+  assert.equal(after.json.data.deltaMc.value, 0.3);
+  assert.equal(after.json.data.deltaMc.nullReason, undefined);
+  assert.equal(after.json.data.deltaWc.value, null);
+  assert.equal(after.json.data.deltaWc.nullReason, "no_policy");
+  assert.notEqual(after.json.data.deltaWc.nullReason, "no_baseline");
+  assert.equal(after.json.data.paybackWithWcMonths.nullReason, "no_policy");
+});
+
 test("EN-12: approve grava audit_log.payload.pack; warn de cadastro exige why ≥ 20", async () => {
   const { A } = await tenants();
   const node = (await q("INSERT INTO nodes (tenant_id, code, name, node_type) VALUES ($1,'N1','N','cd') RETURNING stable_id", [A.tenantId]))[0].stable_id as string;

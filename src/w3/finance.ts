@@ -8,6 +8,8 @@
  * mc_stub_v0: MC = Receita − CPV − CustoLogístico · payback = capex/ΔMC mensal.
  *   1 período → horizonte linear ("projeção linear v0"). capexMi = scenarioImpact().
  * Preço/custo faltante em SKU com volume > 0 → agregados null (nunca soma parcial, nunca 0 silencioso).
+ * Δ: no_baseline só sem plano vigente; baseline com MC/WC null propaga o nullReason dele.
+ * periodDays: YYYY-MM → dias do mês (source period); senão fallback do pack (source default_pack).
  */
 import { readFileSync } from "node:fs";
 import { Ajv2020 } from "ajv/dist/2020.js";
@@ -27,8 +29,10 @@ export const FINANCE_NULL_REASONS = [
 ] as const;
 export type FinanceNullReason = (typeof FINANCE_NULL_REASONS)[number];
 export type DriverSource = "premise" | "cadastro" | "policy" | "default_pack";
+export type PeriodDaySource = "period" | "default_pack";
 
 export interface Money { value: number | null; nullReason?: FinanceNullReason; source: string }
+export interface PeriodDays { value: number; source: PeriodDaySource }
 export interface FinanceDriver { key: string; value: number; source: DriverSource; ref: string | null }
 export interface FinanceMissing {
   entity: "sku"; stable_id: string; code: string; field: "unit_price" | "unit_cost"; cta: string;
@@ -42,7 +46,7 @@ export interface ScenarioFinance {
   cadastroVersion: number;
   stale: boolean;
   period: string | null;
-  periodDays: number;
+  periodDays: PeriodDays;
   horizonMonths: number;
   revenue: Money; cogs: Money; logisticsCost: Money; mc: Money;
   deltaMc: Money; capexMi: Money;
@@ -77,8 +81,16 @@ export interface FinanceComputeInput {
   policyKinds: EffectivePolicyKinds;
   defaults: PackFinanceDefaults;
   plan: { objective: number | null; lines?: { cost: unknown }[] | null } | null;
-  /** null = sem plano vigente. Números null = baseline existe mas o lado dele não fecha. */
-  baseline: { mc: number | null; wc: number | null } | null;
+  /**
+   * null = sem plano vigente (`no_baseline`).
+   * Objeto = plano vigente; mc/wc null carregam o nullReason real daquele lado (não vira no_baseline).
+   */
+  baseline: {
+    mc: number | null;
+    wc: number | null;
+    mcNullReason?: FinanceNullReason;
+    wcNullReason?: FinanceNullReason;
+  } | null;
 }
 
 const MI = 1_000_000;
@@ -106,11 +118,11 @@ function V(value: number | null, source: string, nullReason?: FinanceNullReason)
   return { value: round2(value), source };
 }
 
-/** Dias do mês quando o período é YYYY-MM; senão o fallback do pack (source default_pack). */
-export function daysInPeriod(period: string | null, fallback: number): { days: number; fromMonth: boolean } {
+/** Dias do mês quando o período é YYYY-MM (source `period`); senão o fallback do pack (source `default_pack`). */
+export function daysInPeriod(period: string | null, fallback: number): PeriodDays {
   const m = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(period ?? "");
-  if (!m) return { days: fallback, fromMonth: false };
-  return { days: new Date(Date.UTC(Number(m[1]), Number(m[2]), 0)).getUTCDate(), fromMonth: true };
+  if (!m) return { value: fallback, source: "default_pack" };
+  return { value: new Date(Date.UTC(Number(m[1]), Number(m[2]), 0)).getUTCDate(), source: "period" };
 }
 
 export function financeDefaultsOf(packId: string | null | undefined): PackFinanceDefaults {
@@ -196,17 +208,18 @@ function logisticsOf(input: FinanceComputeInput): { currency: number | null; rea
 
 function blank(reason: FinanceNullReason, source: string): Money { return V(null, source, reason); }
 
-function shell(input: FinanceComputeInput, days: number, horizon: number, capex: Money, partial: {
+function shell(input: FinanceComputeInput, periodDays: PeriodDays, horizon: number, capex: Money, partial: {
   revenue: Money; cogs: Money; logisticsCost: Money; mc: Money;
   wc: ScenarioFinance["wc"]; drivers: FinanceDriver[]; missing: FinanceMissing[];
 }): ScenarioFinance {
-  const dMc = deltaMoney(partial.mc, input.baseline ? input.baseline.mc : undefined, SRC_MC);
-  const dWc = deltaMoney(partial.wc.total, input.baseline ? input.baseline.wc : undefined, `${SRC_WC} · ${SRC_LIN}`);
+  const base = input.baseline;
+  const dMc = deltaMoney(partial.mc, base ? base.mc : undefined, SRC_MC, base?.mcNullReason);
+  const dWc = deltaMoney(partial.wc.total, base ? base.wc : undefined, `${SRC_WC} · ${SRC_LIN}`, base?.wcNullReason);
   return {
     financeVersion: FINANCE_VERSION, formulaVersions: FORMULA_VERSIONS,
     scenarioId: input.scenarioId, scenarioVersion: input.scenarioVersion, runId: input.runId,
     cadastroVersion: input.cadastroVersion, stale: input.stale, period: input.period,
-    periodDays: days, horizonMonths: horizon,
+    periodDays, horizonMonths: horizon,
     revenue: partial.revenue, cogs: partial.cogs, logisticsCost: partial.logisticsCost, mc: partial.mc,
     deltaMc: dMc, capexMi: capex, wc: partial.wc, deltaWc: dWc,
     paybackMonths: paybackOf(capex.value, dMc, 0, horizon, SRC_MC),
@@ -215,10 +228,14 @@ function shell(input: FinanceComputeInput, days: number, horizon: number, capex:
   };
 }
 
-/** baselineNum undefined = não há plano vigente; null = o baseline não fechou o número. */
-function deltaMoney(side: Money, baselineNum: number | null | undefined, source: string): Money {
+/**
+ * baselineNum undefined = não há plano vigente → no_baseline.
+ * null = o baseline existe mas não fechou o número → propaga baselineReason (preço, custo, política, …).
+ */
+function deltaMoney(side: Money, baselineNum: number | null | undefined, source: string, baselineReason?: FinanceNullReason): Money {
   if (side.value === null) return V(null, source, side.nullReason);
-  if (baselineNum === undefined || baselineNum === null) return V(null, source, "no_baseline");
+  if (baselineNum === undefined) return V(null, source, "no_baseline");
+  if (baselineNum === null) return V(null, source, baselineReason);
   return V(round2(side.value - baselineNum), source);
 }
 
@@ -233,13 +250,14 @@ function paybackOf(capex: number | null, deltaMc: Money, extra: number | null, h
 }
 
 export function buildScenarioFinance(input: FinanceComputeInput): ScenarioFinance {
-  const { days } = daysInPeriod(input.period, input.defaults.period_days);
+  const periodDays = daysInPeriod(input.period, input.defaults.period_days);
+  const days = periodDays.value;
   const horizonHit = bestPremise(input.premises, ["horizonMonths", "horizon_months"]);
   const horizon = horizonHit && horizonHit.value > 0 ? horizonHit.value : input.defaults.horizon_months;
   const capexImp = scenarioImpact(input.premises.map((p) => ({ type: p.type, fields: p.fields })));
   const capex = V(capexImp.impactMi, SRC_CAPEX);
 
-  const blocked = (reason: FinanceNullReason): ScenarioFinance => shell(input, days, horizon, capex, {
+  const blocked = (reason: FinanceNullReason): ScenarioFinance => shell(input, periodDays, horizon, capex, {
     revenue: blank(reason, SRC_WC), cogs: blank(reason, SRC_WC),
     logisticsCost: blank(reason, "a4_run.plan"), mc: blank(reason, SRC_MC),
     wc: { inventory: blank(reason, SRC_WC), receivables: blank(reason, SRC_WC), payables: blank(reason, SRC_WC), total: blank(reason, SRC_WC) },
@@ -293,7 +311,7 @@ export function buildScenarioFinance(input: FinanceComputeInput): ScenarioFinanc
   const logisticsCost = log.currency === null ? blank(log.reason ?? "cost_breakdown_unavailable", log.source) : V(toMi(log.currency), log.source);
 
   if (gap) {
-    return shell(input, days, horizon, capex, {
+    return shell(input, periodDays, horizon, capex, {
       revenue: blank(gap, `${SRC_WC} · served×preço`), cogs: blank(gap, `${SRC_WC} · served×custo`),
       logisticsCost, mc: blank(gap, SRC_MC),
       wc: { inventory: blank(gap, SRC_WC), receivables: blank(gap, SRC_WC), payables: blank(gap, SRC_WC), total: blank(gap, SRC_WC) },
@@ -316,7 +334,7 @@ export function buildScenarioFinance(input: FinanceComputeInput): ScenarioFinanc
     ? blank(logisticsCost.nullReason ?? "cost_breakdown_unavailable", SRC_MC)
     : V(round2((revenue.value as number) - (cogs.value as number) - logisticsCost.value), SRC_MC);
 
-  return shell(input, days, horizon, capex, {
+  return shell(input, periodDays, horizon, capex, {
     revenue, cogs, logisticsCost, mc, wc: { inventory, receivables, payables, total }, drivers, missing,
   });
 }
@@ -366,7 +384,13 @@ export function packAuditOf(fin: ScenarioFinance, gates: { state: "ok" | "warn" 
   };
 }
 
-interface CoreParts { input: FinanceComputeInput; mc: number | null; wc: number | null }
+interface CoreParts {
+  input: FinanceComputeInput;
+  mc: number | null;
+  wc: number | null;
+  mcNullReason?: FinanceNullReason;
+  wcNullReason?: FinanceNullReason;
+}
 
 function planParts(plan: unknown): { served: { skuId: string; qty: number }[] | null; legacy: boolean; objective: number | null; lines: { cost: unknown }[] | null; period: string | null } {
   const p = asObj(plan);
@@ -460,7 +484,17 @@ async function loadCore(c: Client, scenarioId: string, runId: string | null | un
     plan: run ? { objective: parts.objective, lines: parts.lines } : null, baseline: null,
   };
   const fin = buildScenarioFinance(input);
-  return { input, mc: fin.mc.value, wc: fin.wc.total.value };
+  return {
+    input, mc: fin.mc.value, wc: fin.wc.total.value,
+    mcNullReason: fin.mc.nullReason, wcNullReason: fin.wc.total.nullReason,
+  };
+}
+
+function baselineFrom(src: CoreParts): NonNullable<FinanceComputeInput["baseline"]> {
+  const b: NonNullable<FinanceComputeInput["baseline"]> = { mc: src.mc, wc: src.wc };
+  if (src.mc === null && src.mcNullReason) b.mcNullReason = src.mcNullReason;
+  if (src.wc === null && src.wcNullReason) b.wcNullReason = src.wcNullReason;
+  return b;
 }
 
 /**
@@ -475,11 +509,10 @@ export async function loadScenarioFinance(c: Client, scenarioId: string, opts?: 
   const approved = await resolvePlanRef(c);
   let baseline: FinanceComputeInput["baseline"] = null;
   if (approved.planRef.basis === "approved" && approved.planRef.scenarioId && approved.planRef.runId) {
-    if (approved.planRef.runId === core.input.runId) baseline = { mc: core.mc, wc: core.wc };
-    else {
-      const other = await loadCore(c, approved.planRef.scenarioId, approved.planRef.runId);
-      baseline = other ? { mc: other.mc, wc: other.wc } : null;
-    }
+    const src = approved.planRef.runId === core.input.runId
+      ? core
+      : await loadCore(c, approved.planRef.scenarioId, approved.planRef.runId);
+    if (src) baseline = baselineFrom(src);
   }
   const fin = buildScenarioFinance({ ...core.input, baseline });
   assertScenarioFinance(fin);
